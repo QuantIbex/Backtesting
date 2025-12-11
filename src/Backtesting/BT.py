@@ -18,6 +18,7 @@ TODO:
 # import matplotlib.pyplot as plt
 
 #------------------------------------------------------------------------------#
+
 class Backtester:
     def __init__(self):
         """Instantiate class object"""
@@ -73,6 +74,18 @@ class Backtester:
         pass
 
 
-
 #------------------------------------------------------------------------------#
+
+class Weights:
+    def __init__(self):
+        """Instantiate class object"""
+        pass
+
+    @staticmethod
+    def normalize_weights(weights):
+        
+        return weights
+
+
+
 #------------------------------------------------------------------------------#

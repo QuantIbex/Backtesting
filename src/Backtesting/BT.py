@@ -68,9 +68,6 @@ class Backtester:
         
         """
 
-
-
-
         pass
 
 
@@ -82,9 +79,39 @@ class Weights:
         pass
 
     @staticmethod
-    def normalize_weights(weights):
+    def net_exposure(weights):
+        """
+        Computes the net exposure
+        """
+        return weights.sum(axis=1)
+
+    @staticmethod
+    def gross_exposure(weights):
+        """
+        Computes the net exposure
+        """
+        return weights.abs().sum(axis=1)
+
+    @staticmethod
+    def normalize_net(weights):
+
+        pass
+
+    @staticmethod
+    def normalize_weights(weights, net = 1, gross = 1, fill_na = 0):
+        """
+        Normalize weights such that each row has a net exposure of 1        
+        """
+
+        if fill_na is not None:
+            weights = weights.fillna(fill_na)
+
+        wgt_net = Weights.net_exposure(weights)
         
-        return weights
+
+
+        return weights.div(wgt_net, axis=0)
+    
 
 
 

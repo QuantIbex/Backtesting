@@ -26,7 +26,7 @@ if False:
 
 
     actual = BT.Weights.normalize_weights(weights= wgt)
-
+    expected = 0
 
 
 

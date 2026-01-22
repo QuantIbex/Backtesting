@@ -3,8 +3,8 @@
 Test suite for class BT.Weights
 
 Execute tests in consol with:
-    python tests/test_Weights.py
-
+    pdm run python -m unittest discover -s tests
+    Did not work : python3 tests/test_Weights.py
 """
 
 import unittest
@@ -67,7 +67,7 @@ class TestWeights(unittest.TestCase):
             [0.8, 0.6, -0.4],
             [0.8, 0.3, -0.1]], columns = ["A", "B", "C"])
         actual = BT.Weights.normalize_weights(weights= wgt)
-        pd.testing.assert_frame_equal(actual, expected)
+        pd.testing.assert_frame_equal(actual, expected, check_exact=False, atol= 1e-8)
 
     def test_normalize_weights_short_portfolio(self):
         """

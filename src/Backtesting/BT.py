@@ -13,8 +13,8 @@ TODO:
 #------------------------------------------------------------------------------#
 
 # import os
-# import numpy as np
-# import pandas as pd
+import numpy as np
+import pandas as pd
 # import matplotlib.pyplot as plt
 
 #------------------------------------------------------------------------------#
@@ -40,35 +40,63 @@ class Backtester:
     def run(self):
         """Runs the backtest and generates model portfolios
         
-        Iterate on days
-            Determine investable universe
-                Filter on liquidity
-                Filter on exclusions (ESG)
-                Store investable universe
-            Iterate on strategies
-                Compute model portfolio (if needed)
-                    Apply group strategy
-                        Form groups
-                            Filter assets on available data
-                            Appla grouping method
-                        Compute group-based model portfolio
-                    Store reference weights
-                    Compute asset-based model portfolio
-                    Store asset weights
-                Store tranches weights and allocations
-                Aggregate tranches
-
-            Aggregate strategies
-                Compute strategies weights
-                    Compute risk/return strategy metrics
-            Store model portfolio
-            Determine if new model portfolio is implemented
-            Determine trades
-            Compute allocations, fees, prices, weights
+        Check in markdown document
         
         """
 
+        # Iterate on days
+
+
+
         pass
+
+
+#------------------------------------------------------------------------------#
+
+class Metrics:
+    def __init__(self):
+        """Instantiate class object"""
+        
+        pass
+
+    def compute(self, pars, data):
+        pass
+
+    @ staticmethod
+    def compute_single(pars, data):
+        pass
+
+    @staticmethod
+    def aggregate():
+        pass
+
+
+    @staticmethod
+    def momentum(prices: pd.DataFrame,
+                 lookback: int,
+                 skip: int = 0,
+                 only_last: bool = False) -> pd.DataFrame:
+        """
+        Momentum over `lookback` periods, excluding the most recent `skip` periods.
+        If only_last is True, return only the last row (1-row DataFrame).
+        """
+
+        mom = prices.shift(skip).pct_change(periods=lookback)
+        if only_last:
+            # TODO: improve computation for speed if needed
+            return mom.iloc[[-1]]
+        else:
+            return mom
+
+    @staticmethod
+    def sharpe_momentum(prices: pd.DataFrame,
+                 lookback: int,
+                 skip: int = 0,
+                 only_last: bool = False) -> pd.DataFrame:
+        """
+        Momentum over `lookback` periods, excluding the most recent `skip` periods.
+        If only_last is True, return only the last row (1-row DataFrame).
+        """
 
 
 #------------------------------------------------------------------------------#
@@ -93,9 +121,11 @@ class Weights:
         return weights.abs().sum(axis=1)
 
     @staticmethod
-    def normalize_net(weights):
+    def normalize(weights, net = 1, gross = 1, keep_net_short = True, fill_na = 0):
 
         pass
+
+    # TODO(CDO): fix this (problème when net short. Imlement normalize function instead)
 
     @staticmethod
     def normalize_weights(weights, net = 1, gross = 1, fill_na = 0):

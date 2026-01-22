@@ -75,11 +75,20 @@ class Metrics:
     def momentum(prices: pd.DataFrame,
                  lookback: int,
                  skip: int = 0,
-                 only_last: bool = False) -> pd.DataFrame:
+                 only_last: bool = True) -> pd.DataFrame:
         """
         Momentum over `lookback` periods, excluding the most recent `skip` periods.
         If only_last is True, return only the last row (1-row DataFrame).
         """
+
+        assert isinstance(prices, pd.DataFrame), "Input 'prices' must be a Pandas DataFrame."
+        assert isinstance(lookback, int), "Input 'lookback' must be an int."
+        assert isinstance(skip, int), "Input 'skip' must be an int."
+        assert isinstance(only_last, bool), "Input 'only_last' must be a bool."
+        assert lookback > 0, "Input 'lookback' must be positive."
+        assert skip >= 0, "Input 'skip' must be non-negative."
+        assert lookback < prices.shape[0], "Input 'lookback' must be less the number of periods in 'prices'."
+        assert skip < lookback, "Input 'skip' must be less than 'lookback'."
 
         mom = prices.shift(skip).pct_change(periods=lookback)
         if only_last:

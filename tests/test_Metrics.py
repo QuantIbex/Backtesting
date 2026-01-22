@@ -29,7 +29,7 @@ class TestMetrics(unittest.TestCase):
         return prices
 
     def test_momentum_default_values(self):
-        
+        """Obvious"""
         prices = self._generate_test_prices(n_periods = 12, n_assets = 6)
 
         lback = 5
@@ -38,7 +38,7 @@ class TestMetrics(unittest.TestCase):
         pd.testing.assert_frame_equal(actual, expected)
 
     def test_momentum_no_skipped_values(self):
-        
+        """Obvious"""
         prices = self._generate_test_prices(n_periods = 12, n_assets = 6)
 
         # Case: all periods
@@ -60,7 +60,7 @@ class TestMetrics(unittest.TestCase):
         pd.testing.assert_frame_equal(actual, expected)
 
     def test_momentum_skipped_values(self):
-        
+        """Obvious"""
         prices = self._generate_test_prices(n_periods = 12, n_assets = 6)
 
         # Case: all periods
@@ -77,8 +77,16 @@ class TestMetrics(unittest.TestCase):
         actual = BT.Metrics.momentum(prices, lookback=lback, skip=skp, only_last=False)
         pd.testing.assert_frame_equal(actual, expected)
 
-
-
+    def test_compute_single_metric(self):
+        """Obvious"""
+        prices = self._generate_test_prices(n_periods = 12, n_assets = 6)
+        data = {"prices": prices}
+        specs = {"type": "MOMENTUM", "lookback": 5, "skip": 2, "only_last": False}
+        
+        expected = BT.Metrics.momentum(prices=data["prices"], lookback=specs.get("lookback"),
+                                       skip=specs.get("skip"), only_last=specs.get("only_last"))
+        actual = BT.Metrics.compute_single_metric(specs=specs, data=data)
+        pd.testing.assert_frame_equal(actual, expected)
 
 if __name__ == "__main__":
     unittest.main()

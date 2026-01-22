@@ -56,19 +56,40 @@ class Backtester:
 class Metrics:
     def __init__(self):
         """Instantiate class object"""
-        
         pass
 
-    def compute(self, pars, data):
+
+    def compute(self, specs, data):
         pass
 
-    @ staticmethod
-    def compute_single(pars, data):
-        pass
+    def aggregate_metrics(self, specs, metrics):
+        """
+        Aggregate several metrics
+        """
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(metrics, list), "Input 'data' must be a list."
+
+
+        # continue dev from here (specs["method"])
+        # check that metrics are compatible?
+
 
     @staticmethod
-    def aggregate():
-        pass
+    def compute_single_metric(specs, data):
+        """
+        Compute single metric
+        """
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(data, dict), "Input 'data' must be a dict."
+
+        if specs["type"].lower() == "momentum":
+            return Metrics.momentum(
+                prices = data["prices"],
+                lookback = specs["lookback"],
+                skip = specs.get("skip"),
+                only_last = specs.get("only_last"))
+        else:
+            raise ValueError("Invalid choise of metric type!")
 
 
     @staticmethod
@@ -80,6 +101,10 @@ class Metrics:
         Momentum over `lookback` periods, excluding the most recent `skip` periods.
         If only_last is True, return only the last row (1-row DataFrame).
         """
+        if skip is None:
+            skip = 0
+        if only_last is None:
+            only_last = True
 
         assert isinstance(prices, pd.DataFrame), "Input 'prices' must be a Pandas DataFrame."
         assert isinstance(lookback, int), "Input 'lookback' must be an int."
@@ -106,6 +131,7 @@ class Metrics:
         Momentum over `lookback` periods, excluding the most recent `skip` periods.
         If only_last is True, return only the last row (1-row DataFrame).
         """
+        raise ValueError("Not implemented yet")
 
 
 #------------------------------------------------------------------------------#

@@ -122,12 +122,47 @@ class Metrics:
     @staticmethod
     def compute(specs: dict, data: dict):
         """
-        Compute one or several metrics and aggregate them if needed.
+        Compute single and aggregated metrics from the provided specifications and data.
 
+        This method accepts a metric specification dictionary and a data dictionary,
+        computes each requested metric via 'Metrics.compute_single', and optionally
+        aggregates them using 'Metrics.aggregate' when multiple metrics are defined.
+        The 'specs["metrics"]' entry may be either a single metric specification
+        (dict) or a list of metric specifications. If multiple single metrics are
+        computed, the aggregation behavior is controlled by 'specs["aggregate"]'.
 
+        Parameters
+        ----------
+        specs : dict
+            Dictionary defining the metrics to compute and, optionally, how to
+            aggregate them. Must contain a 'metrics' key with either a dict
+            (single metric specification) or a list of dicts (multiple metrics).
+            When multiple metrics are provided, an 'aggregate' key is expected
+            to define the aggregation configuration.
+        data : dict
+            Input data required to compute the metrics. This is passed unchanged
+            to 'Metrics.compute_single' for each metric specification.
 
+        Returns
+        -------
+        dict
+            A dictionary with the following keys:
+            - 'single_metrics': list
+                List of metric results returned by 'Metrics.compute_single' for
+                each element in 'specs["metrics"]'.
+            - 'global_metrics': Any
+                Aggregated result returned by 'Metrics.aggregate' when multiple
+                metrics are computed, or the single metric result when only one
+                metric is specified.
 
+        Raises
+        ------
+        AssertionError
+            If 'specs' or 'data' is not a dictionary.
+        TypeError
+            If 'specs["metrics"]' is neither a dictionary nor a list.
         """
+
         assert isinstance(specs, dict), "Input 'specs' must be a dict."
         assert isinstance(data, dict), "Input 'data' must be a dict."
 
@@ -136,7 +171,7 @@ class Metrics:
         elif isinstance(specs["metrics"], list):
             m_specs = specs["metrics"]
         else:
-            raise ValueError("Element 'metrics' of input 'specs' must be a list or a dict!")
+            raise TypeError("Element 'metrics' of input 'specs' must be a list or a dict!")
 
         single_metrics = [Metrics.compute_single(specs = s, data = data) for s in m_specs]
 
@@ -173,7 +208,7 @@ class Metrics:
 
         if specs["type"].lower() == "momentum":
             return Metrics.momentum(
-                prices = data["prices"],
+                prices = data[specs["var_name"]],
                 lookback = specs["lookback"],
                 skip = specs.get("skip"),
                 only_last = specs.get("only_last"))

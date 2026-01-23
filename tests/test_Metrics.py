@@ -4,7 +4,7 @@ Test suite for class BT.Metrics
 
 Execute tests in consol with:
     pdm run python -m unittest discover -s tests
-    Did not work : python3 tests/test_Metrics.py
+    
 """
 
 import unittest
@@ -77,7 +77,7 @@ class TestMetrics(unittest.TestCase):
         actual = BT.Metrics.momentum(prices, lookback=lback, skip=skp, only_last=False)
         pd.testing.assert_frame_equal(actual, expected)
 
-    def test_compute_single_metric(self):
+    def test_compute_single(self):
         """Obvious"""
         prices = self._generate_test_prices(n_periods = 12, n_assets = 6)
         data = {"prices": prices}
@@ -85,29 +85,74 @@ class TestMetrics(unittest.TestCase):
         
         expected = BT.Metrics.momentum(prices=data["prices"], lookback=specs.get("lookback"),
                                        skip=specs.get("skip"), only_last=specs.get("only_last"))
-        actual = BT.Metrics.compute_single_metric(specs=specs, data=data)
+        actual = BT.Metrics.compute_single(specs=specs, data=data)
         pd.testing.assert_frame_equal(actual, expected)
 
-    def test_aggregate_metrics(self):
+    def test_aggregate(self):
         """Obvious"""
         metrics = [BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=1),
             BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=2),
             BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=3),
             BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=4)]
 
-
         # Equally-weighted mean
         specs = {"method": "mean"}
         expected = BT.Utils.weighted_mean_dfs(dfs = metrics, weights = None) 
-        actual = BT.Metrics.aggregate_metrics(specs = specs, metrics= metrics)
+        actual = BT.Metrics.aggregate(specs = specs, metrics= metrics)
         pd.testing.assert_frame_equal(actual, expected)
 
         # Non-equally-weighted mean
         wgts = [1, 2, 3, 4]
         specs = {"method": "mean", "weights": wgts}
         expected = BT.Utils.weighted_mean_dfs(dfs = metrics, weights = wgts) 
-        actual = BT.Metrics.aggregate_metrics(specs = specs, metrics= metrics)
+        actual = BT.Metrics.aggregate(specs = specs, metrics = metrics)
         pd.testing.assert_frame_equal(actual, expected)
+
+    def test_compute_one(self):
+        """Obvious"""
+
+        data = {"prices": BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=1)}
+        m_specs = {"type": "MOMENTUM", "lookback": 5, "skip": 2, "only_last": False}
+        mom = BT.Metrics.momentum(prices=data["prices"], lookback=m_specs["lookback"],
+                                       skip=m_specs["skip"], only_last=m_specs["only_last"])
+
+        # Specs as dict
+        specs1 = {"metrics": m_specs}
+        expected = {"single_metrics": [mom], "global_metrics": mom}
+        actual = BT.Metrics.compute(specs = specs1, data = data)
+        self.assertEqual(len(actual["single_metrics"]), 1)
+        pd.testing.assert_frame_equal(actual["single_metrics"][0], mom)
+        pd.testing.assert_frame_equal(actual["global_metrics"], mom)
+
+        # Specs in list
+        specs2 = {"metrics": [m_specs]}
+        expected = {"single_metrics": [mom], "global_metrics": mom}
+        actual = BT.Metrics.compute(specs = specs2, data = data)
+        self.assertEqual(len(actual["single_metrics"]), 1)
+        pd.testing.assert_frame_equal(actual["single_metrics"][0], expected["single_metrics"][0])
+        pd.testing.assert_frame_equal(actual["global_metrics"], expected["global_metrics"])
+
+    def test_compute_several(self):
+        """Obvious"""
+
+        data = {"prices": BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=1)}
+        m_specs_1 = {"type": "MOMENTUM", "lookback": 5, "skip": 2, "only_last": False}
+        m_specs_2 = {"type": "MOMENTUM", "lookback": 7, "skip": 3, "only_last": False}
+        a_specs = {"method": "mean", "weights": [1, 2]}
+        mom_1 = BT.Metrics.momentum(prices=data["prices"], lookback=m_specs_1["lookback"],
+                                       skip=m_specs_1["skip"], only_last=m_specs_1["only_last"])
+        mom_2 = BT.Metrics.momentum(prices=data["prices"], lookback=m_specs_2["lookback"],
+                                       skip=m_specs_2["skip"], only_last=m_specs_2["only_last"])
+        agg_mom = BT.Metrics.aggregate(specs = a_specs, metrics=[mom_1, mom_2])
+        
+        # Specs in list
+        specs = {"metrics": [m_specs_1, m_specs_2], "aggregate": a_specs}
+        expected = {"single_metrics": [mom_1, mom_2], "global_metrics": agg_mom}
+        actual = BT.Metrics.compute(specs = specs, data = data)
+        self.assertEqual(len(actual["single_metrics"]), 2)
+        pd.testing.assert_frame_equal(actual["single_metrics"][0], expected["single_metrics"][0])
+        pd.testing.assert_frame_equal(actual["single_metrics"][1], expected["single_metrics"][1])
+        pd.testing.assert_frame_equal(actual["global_metrics"], expected["global_metrics"])
 
 
 if __name__ == "__main__":

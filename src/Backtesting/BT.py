@@ -119,11 +119,37 @@ class Metrics:
         pass
 
 
-    def compute(self, specs, data):
-        pass
+    @staticmethod
+    def compute(specs: dict, data: dict):
+        """
+        Compute one or several metrics and aggregate them if needed.
+
+
+
+
+        """
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(data, dict), "Input 'data' must be a dict."
+
+        if isinstance(specs["metrics"], dict):
+            m_specs = [specs["metrics"]]
+        elif isinstance(specs["metrics"], list):
+            m_specs = specs["metrics"]
+        else:
+            raise ValueError("Element 'metrics' of input 'specs' must be a list or a dict!")
+
+        single_metrics = [Metrics.compute_single(specs = s, data = data) for s in m_specs]
+
+        if len(single_metrics) > 1:
+            global_metrics = Metrics.aggregate(specs = specs["aggregate"], metrics = single_metrics)
+        else:
+            global_metrics = single_metrics[0]
+
+        return {"single_metrics": single_metrics, "global_metrics": global_metrics}
+
 
     @staticmethod
-    def aggregate_metrics(specs, metrics):
+    def aggregate(specs, metrics):
         """
         Aggregate several metrics
         """
@@ -138,7 +164,7 @@ class Metrics:
 
 
     @staticmethod
-    def compute_single_metric(specs: list, data: list) -> pd.DataFrame:
+    def compute_single(specs: list, data: list) -> pd.DataFrame:
         """
         Compute single metric
         """

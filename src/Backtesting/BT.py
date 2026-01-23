@@ -53,6 +53,66 @@ class Backtester:
 
 #------------------------------------------------------------------------------#
 
+class Utils:
+    def __init__(self):
+        """Instantiate class object"""
+        pass
+
+    @staticmethod
+    def generate_random_prices(n_periods: int, n_assets: int, seed:int = 0) -> pd.DataFrame:
+        """
+        Helper method. Generate a datafram with random prices.
+        """
+        if False:
+            n_periods = 12
+            n_assets = 6
+        np.random.seed(seed)  # for reproducibility        
+        inds = pd.date_range(start="2019-12-31", periods=n_periods + 1, freq="ME")
+        cols = [f"Asset_{i}" for i in range(1, n_assets+1)]
+        px = 90 + 20 * np.random.rand(n_periods + 1, n_assets)
+        prices = pd.DataFrame(px, index=inds, columns=cols)
+        return prices
+
+    @staticmethod
+    def all_same_index_columns(dfs: list) -> bool:
+        """
+        Verify that all DataFrames in a list share identical indices and columns, 
+        by comparing each against the first one.
+        This approach confirms exact matches, including order and type.
+        Returns a boolean.
+        """
+        assert isinstance(dfs, list), "Input 'dfs' must be a list."
+
+        if len(dfs) == 1:
+            return True
+        else:
+            ref_index = dfs[0].index
+            ref_cols = dfs[0].columns
+            return all(
+                df.index.equals(ref_index) and df.columns.equals(ref_cols)
+                for df in dfs[1:]
+            )
+
+    @staticmethod
+    def weighted_mean_dfs(dfs: list, weights: list = None) -> pd.DataFrame:
+        """
+        Compute weighted mean of a list of DataFrames.
+        Returns a single DataFrame with same index/columns.
+        """
+
+        assert Utils.all_same_index_columns(dfs), "Input 'dfs' must contain compatible pd.DataFrame."
+
+        # stack into 3D array: (n_dfs, n_rows, n_cols)
+        arr = np.stack([df.to_numpy() for df in dfs], axis=0)
+
+        # weighted mean along first axis
+        wm = np.average(arr, axis=0, weights=weights)
+
+        # reconstruct DataFrame
+        return pd.DataFrame(wm, index=dfs[0].index, columns=dfs[0].columns)
+
+#------------------------------------------------------------------------------#
+
 class Metrics:
     def __init__(self):
         """Instantiate class object"""
@@ -62,20 +122,23 @@ class Metrics:
     def compute(self, specs, data):
         pass
 
-    def aggregate_metrics(self, specs, metrics):
+    @staticmethod
+    def aggregate_metrics(specs, metrics):
         """
         Aggregate several metrics
         """
         assert isinstance(specs, dict), "Input 'specs' must be a dict."
         assert isinstance(metrics, list), "Input 'data' must be a list."
 
-
-        # continue dev from here (specs["method"])
-        # check that metrics are compatible?
+        if specs["method"].lower() == "mean":
+            w = specs.get("weights")
+            return Utils.weighted_mean_dfs(dfs = metrics, weights = w)
+        else:
+            raise ValueError("Invalid choice of aggregation method!")
 
 
     @staticmethod
-    def compute_single_metric(specs, data):
+    def compute_single_metric(specs: list, data: list) -> pd.DataFrame:
         """
         Compute single metric
         """

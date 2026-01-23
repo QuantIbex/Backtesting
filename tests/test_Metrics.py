@@ -88,5 +88,27 @@ class TestMetrics(unittest.TestCase):
         actual = BT.Metrics.compute_single_metric(specs=specs, data=data)
         pd.testing.assert_frame_equal(actual, expected)
 
+    def test_aggregate_metrics(self):
+        """Obvious"""
+        metrics = [BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=1),
+            BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=2),
+            BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=3),
+            BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=4)]
+
+
+        # Equally-weighted mean
+        specs = {"method": "mean"}
+        expected = BT.Utils.weighted_mean_dfs(dfs = metrics, weights = None) 
+        actual = BT.Metrics.aggregate_metrics(specs = specs, metrics= metrics)
+        pd.testing.assert_frame_equal(actual, expected)
+
+        # Non-equally-weighted mean
+        wgts = [1, 2, 3, 4]
+        specs = {"method": "mean", "weights": wgts}
+        expected = BT.Utils.weighted_mean_dfs(dfs = metrics, weights = wgts) 
+        actual = BT.Metrics.aggregate_metrics(specs = specs, metrics= metrics)
+        pd.testing.assert_frame_equal(actual, expected)
+
+
 if __name__ == "__main__":
     unittest.main()

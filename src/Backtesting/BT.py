@@ -196,7 +196,7 @@ class Metrics:
             raise ValueError("Invalid choice of aggregation method!")
 
     @staticmethod
-    def compute_single(specs: list, data: list) -> pd.DataFrame:
+    def compute_single(specs: list, data: dict) -> pd.DataFrame:
         """
         Compute single metric
         """
@@ -271,18 +271,21 @@ class Ratings:
         pass
 
     @staticmethod
-    def compute_single(specs: list, data: list) -> pd.DataFrame:
+    def compute_single(specs: list, data: dict) -> pd.DataFrame:
         """
         Compute single rating
         """
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(data, dict), "Input 'data' must be a dict."
+
         if specs["type"].lower() == "identity":
             return Ratings.identity(metrics = data[specs["var_name"]])
         elif specs["type"].lower() == "rank":
-            pass
+            return Ratings.rank(metrics = data[specs["var_name"]])
         elif specs["type"].lower() == "uscore":
-            pass
+            return Ratings.uscore(metrics = data[specs["var_name"]], scaling = specs.get("scaling"))
         elif specs["type"].lower() == "zscore":
-            pass
+            return Ratings.zscore(metrics = data[specs["var_name"]])
         else:
             raise ValueError("Invalid choice of rating type!")
 
@@ -318,6 +321,10 @@ class Ratings:
         else:
             raise ValueError("Invalid choice of scaling type!")
 
+    @staticmethod
+    def zscore(metrics: pd.DataFrame) -> pd.DataFrame:
+        """Compute ratings based on zscore"""
+        return metrics.sub(metrics.mean(axis=1), axis=0).div(metrics.std(axis=1), axis=0)
 
 #------------------------------------------------------------------------------#
 

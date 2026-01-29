@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 class TestMetrics(unittest.TestCase):
+    """Obvious"""
 
     def _generate_test_prices(self, n_periods: int, n_assets: int) -> pd.DataFrame:
         """

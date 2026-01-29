@@ -118,9 +118,8 @@ class Metrics:
         """Instantiate class object"""
         pass
 
-
     @staticmethod
-    def compute(specs: dict, data: dict):
+    def compute(specs: dict, data: dict) -> dict:
         """
         Compute single and aggregated metrics from the provided specifications and data.
 
@@ -182,21 +181,19 @@ class Metrics:
 
         return {"single_metrics": single_metrics, "global_metrics": global_metrics}
 
-
     @staticmethod
-    def aggregate(specs, metrics):
+    def aggregate(specs: dict, metrics: list) -> pd.DataFrame:
         """
         Aggregate several metrics
         """
         assert isinstance(specs, dict), "Input 'specs' must be a dict."
-        assert isinstance(metrics, list), "Input 'data' must be a list."
+        assert isinstance(metrics, list), "Input 'metrics' must be a list."
 
         if specs["method"].lower() == "mean":
             w = specs.get("weights")
             return Utils.weighted_mean_dfs(dfs = metrics, weights = w)
         else:
             raise ValueError("Invalid choice of aggregation method!")
-
 
     @staticmethod
     def compute_single(specs: list, data: list) -> pd.DataFrame:
@@ -214,7 +211,6 @@ class Metrics:
                 only_last = specs.get("only_last"))
         else:
             raise ValueError("Invalid choise of metric type!")
-
 
     @staticmethod
     def momentum(prices: pd.DataFrame,
@@ -247,7 +243,7 @@ class Metrics:
             return mom
 
     @staticmethod
-    def sharpe_momentum(prices: pd.DataFrame,
+    def TODO_sharpe_momentum(prices: pd.DataFrame,
                  lookback: int,
                  skip: int = 0,
                  only_last: bool = False) -> pd.DataFrame:
@@ -256,6 +252,71 @@ class Metrics:
         If only_last is True, return only the last row (1-row DataFrame).
         """
         raise ValueError("Not implemented yet")
+
+
+#------------------------------------------------------------------------------#
+
+class Ratings:
+    def __init__(self):
+        """Instantiate class object"""
+        pass
+
+    @staticmethod
+    def compute(specs: dict, data: dict) -> dict:
+        """To be completed"""
+        pass
+
+    @staticmethod
+    def aggregate(specs: dict, ratings: list) -> pd.DataFrame:
+        pass
+
+    @staticmethod
+    def compute_single(specs: list, data: list) -> pd.DataFrame:
+        """
+        Compute single rating
+        """
+        if specs["type"].lower() == "identity":
+            return Ratings.identity(metrics = data[specs["var_name"]])
+        elif specs["type"].lower() == "rank":
+            pass
+        elif specs["type"].lower() == "uscore":
+            pass
+        elif specs["type"].lower() == "zscore":
+            pass
+        else:
+            raise ValueError("Invalid choice of rating type!")
+
+    @staticmethod
+    def identity(metrics: pd.DataFrame) -> pd.DataFrame:
+        """Compute ratings as identity (unchanged values)"""
+        return metrics
+
+    @staticmethod
+    def rank(metrics: pd.DataFrame) -> pd.DataFrame:
+        """Compute ratings based on rank in ascending order"""
+        return metrics.rank(axis=1, ascending=True)
+    
+    @staticmethod
+    def uscore(metrics: pd.DataFrame, scaling: int = "n-1") -> pd.DataFrame:
+        """
+        Compute ratings based on normalized ranks.
+        Possible scalings are:
+         - "n-1" (default): computed as (rank(x) - 1) / ( n - 1), and values are in [0, 1].
+         - "n: computed as rank(x) / n, and values are in [1/n, 1].
+         - "n+1": computed as rank(x) / ( n + 1), and values are in [1/(n+1), n/(n+1)].
+        """
+
+        rnks = Ratings.rank(metrics=metrics)
+        cnts = metrics.count(axis=1)
+
+        if (scaling is None) | (scaling == "n-1"):
+            return (rnks - 1).div(cnts - 1, axis=0)
+        elif scaling == "n":
+            return rnks.div(cnts, axis=0)
+        elif scaling == "n+1":
+            return rnks.div(cnts + 1, axis=0)
+        else:
+            raise ValueError("Invalid choice of scaling type!")
 
 
 #------------------------------------------------------------------------------#

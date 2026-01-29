@@ -1,10 +1,10 @@
 #%%
 """
-Test suite for class BT.Metrics
+Test suite for class BT.Utils
 
 Execute tests in consol with:
     pdm run python -m unittest discover -s tests
-    Did not work : python3 tests/test_Metrics.py
+    
 """
 
 import unittest
@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 class TestMetrics(unittest.TestCase):
+    """Obvious"""
 
     def test_all_same_index_columns(self):
         """Obvious"""

@@ -119,19 +119,19 @@ class TestMetrics(unittest.TestCase):
 
         # Specs as dict
         specs1 = {"metrics": m_specs}
-        expected = {"single_metrics": [mom], "global_metrics": mom}
+        expected = {"singles": [mom], "global": mom}
         actual = BT.Metrics.compute(specs = specs1, data = data)
-        self.assertEqual(len(actual["single_metrics"]), 1)
-        pd.testing.assert_frame_equal(actual["single_metrics"][0], mom)
-        pd.testing.assert_frame_equal(actual["global_metrics"], mom)
+        self.assertEqual(len(actual["singles"]), 1)
+        pd.testing.assert_frame_equal(actual["singles"][0], mom)
+        pd.testing.assert_frame_equal(actual["global"], mom)
 
         # Specs in list
         specs2 = {"metrics": [m_specs]}
-        expected = {"single_metrics": [mom], "global_metrics": mom}
+        expected = {"singles": [mom], "global": mom}
         actual = BT.Metrics.compute(specs = specs2, data = data)
-        self.assertEqual(len(actual["single_metrics"]), 1)
-        pd.testing.assert_frame_equal(actual["single_metrics"][0], expected["single_metrics"][0])
-        pd.testing.assert_frame_equal(actual["global_metrics"], expected["global_metrics"])
+        self.assertEqual(len(actual["singles"]), 1)
+        pd.testing.assert_frame_equal(actual["singles"][0], expected["singles"][0])
+        pd.testing.assert_frame_equal(actual["global"], expected["global"])
 
     def test_compute___several(self):
         """Obvious"""
@@ -147,12 +147,12 @@ class TestMetrics(unittest.TestCase):
         agg_mom = BT.Metrics.aggregate(specs = a_specs, metrics=[mom_1, mom_2])
         
         specs = {"metrics": [m_specs_1, m_specs_2], "aggregate": a_specs}
-        expected = {"single_metrics": [mom_1, mom_2], "global_metrics": agg_mom}
+        expected = {"singles": [mom_1, mom_2], "global": agg_mom}
         actual = BT.Metrics.compute(specs = specs, data = data)
-        self.assertEqual(len(actual["single_metrics"]), 2)
-        pd.testing.assert_frame_equal(actual["single_metrics"][0], expected["single_metrics"][0])
-        pd.testing.assert_frame_equal(actual["single_metrics"][1], expected["single_metrics"][1])
-        pd.testing.assert_frame_equal(actual["global_metrics"], expected["global_metrics"])
+        self.assertEqual(len(actual["singles"]), 2)
+        pd.testing.assert_frame_equal(actual["singles"][0], expected["singles"][0])
+        pd.testing.assert_frame_equal(actual["singles"][1], expected["singles"][1])
+        pd.testing.assert_frame_equal(actual["global"], expected["global"])
 
 if __name__ == "__main__":
     unittest.main()

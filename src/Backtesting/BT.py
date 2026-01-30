@@ -8,6 +8,11 @@ TODO:
 - 
 - 
 - 
+
+
+Prompt to get docstring
+    Propose a professional and relevant docstring for the following method of a python class:
+    
 """
 
 #------------------------------------------------------------------------------#
@@ -179,7 +184,7 @@ class Metrics:
         else:
             global_metrics = single_metrics[0]
 
-        return {"single_metrics": single_metrics, "global_metrics": global_metrics}
+        return {"singles": single_metrics, "global": global_metrics}
 
     @staticmethod
     def aggregate(specs: dict, metrics: list) -> pd.DataFrame:
@@ -190,8 +195,8 @@ class Metrics:
         assert isinstance(metrics, list), "Input 'metrics' must be a list."
 
         if specs["method"].lower() == "mean":
-            w = specs.get("weights")
-            return Utils.weighted_mean_dfs(dfs = metrics, weights = w)
+            
+            return Utils.weighted_mean_dfs(dfs = metrics, weights = specs.get("weights"))
         else:
             raise ValueError("Invalid choice of aggregation method!")
 
@@ -263,12 +268,69 @@ class Ratings:
 
     @staticmethod
     def compute(specs: dict, data: dict) -> dict:
-        """To be completed"""
-        pass
+        """
+        Compute individual and aggregated ratings based on the provided specifications and input data.
+
+        This method interprets the 'ratings' configuration in `specs` — either a single dictionary
+        or a list of dictionaries — then delegates the computation of each individual rating to
+        `Ratings.compute_single()`. If multiple ratings are produced, they are combined into a
+        global rating using `Ratings.aggregate()`.
+
+        Parameters
+        ----------
+        specs : dict
+            Rating specification dictionary containing:
+            - "ratings" : dict or list of dicts defining one or more rating configurations.
+            - "aggregate" : dict specifying aggregation parameters (used when multiple ratings exist).
+        data : dict
+            Input data required to compute the ratings.
+
+        Returns
+        -------
+        dict
+            A dictionary with:
+            - "singles": list of computed individual ratings.
+            - "global": aggregated global rating (or the single rating if only one was computed).
+
+        Raises
+        ------
+        TypeError
+            If the 'ratings' element in `specs` is not a dict or list of dicts.
+        AssertionError
+            If `specs` or `data` are not dictionaries.
+        """
+        
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(data, dict), "Input 'data' must be a dict."
+
+        if isinstance(specs["ratings"], dict):
+            r_specs = [specs["ratings"]]
+        elif isinstance(specs["ratings"], list):
+            r_specs = specs["ratings"]
+        else:
+            raise TypeError("Element 'ratings' of input 'specs' must be a list or a dict!")
+
+        single_ratings = [Ratings.compute_single(specs = s, data = data) for s in r_specs]
+
+        if len(single_ratings) > 1:
+            global_ratings = Ratings.aggregate(specs = specs["aggregate"], ratings = single_ratings)
+        else:
+            global_ratings = single_ratings[0]
+
+        return {"singles": single_ratings, "global": global_ratings}
 
     @staticmethod
     def aggregate(specs: dict, ratings: list) -> pd.DataFrame:
-        pass
+        """
+        Aggregate several ratings
+        """
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(ratings, list), "Input 'ratings' must be a list."
+
+        if specs["method"].lower() == "mean":
+            return Utils.weighted_mean_dfs(dfs = ratings, weights = specs.get("weights"))
+        else:
+            raise ValueError("Invalid choice of aggregation method!")
 
     @staticmethod
     def compute_single(specs: list, data: dict) -> pd.DataFrame:

@@ -25,6 +25,7 @@ import pandas as pd
 #------------------------------------------------------------------------------#
 
 class Backtester:
+    """Main class for backtesting"""
     def __init__(self):
         """Instantiate class object"""
         self.pars = {}
@@ -55,10 +56,10 @@ class Backtester:
 
         pass
 
-
 #------------------------------------------------------------------------------#
 
 class Utils:
+    """Class of utility functions"""
     def __init__(self):
         """Instantiate class object"""
         pass
@@ -116,9 +117,27 @@ class Utils:
         # reconstruct DataFrame
         return pd.DataFrame(wm, index=dfs[0].index, columns=dfs[0].columns)
 
+
+    # TODO: add unit tests
+    # TODO: move this to a portfolio dedicated class
+    # TODO: allow grouping at sub-portfolio level (to compute sub-portfolio prices)? 
+    @staticmethod
+    def compute_buy_and_hold_portfolio_prices(weights, asset_prices, start_value=100):
+        """Compute the price of a buy-and-hold portfolio"""
+
+        print("Unit tests are missing for 'Utils.compute_buy_and_hold_portfolio_prices'")
+
+        assert weights.shape[0] == 1
+        assert (weights.sum(axis=1) - 1).abs().values < 1-e-12
+        assert weights.index[0] == asset_prices.index[0]
+        assert all(weights.columns == asset_prices.columns)
+
+        return start_value * asset_prices(asset_prices.iloc[0, :]).mul(weights.values).sum(axis=1)
+                
 #------------------------------------------------------------------------------#
 
 class Metrics:
+    """Class to compute and handle metrics"""
     def __init__(self):
         """Instantiate class object"""
         pass
@@ -258,10 +277,10 @@ class Metrics:
         """
         raise ValueError("Not implemented yet")
 
-
 #------------------------------------------------------------------------------#
 
 class Ratings:
+    """Class to compute and handle ratings"""
     def __init__(self):
         """Instantiate class object"""
         pass
@@ -387,6 +406,43 @@ class Ratings:
     def zscore(metrics: pd.DataFrame) -> pd.DataFrame:
         """Compute ratings based on zscore"""
         return metrics.sub(metrics.mean(axis=1), axis=0).div(metrics.std(axis=1), axis=0)
+
+#------------------------------------------------------------------------------#
+
+# TODO: implement all methods for this class
+class Signals:
+    """Class to compute and handle signals"""
+    def __init__(self):
+        """Instantiate class object"""
+        pass
+
+#------------------------------------------------------------------------------#
+
+class Groups:
+    """Class to compute and handle asset groups"""
+    def __init__(self):
+        """Instantiate class object"""
+        pass
+    
+
+    # TODO
+    @staticmethod
+    def none(prices: pd.DataFrame) -> pd.DataFrame:
+        """
+        TBD.
+        If only_last is True, return only the last row (1-row DataFrame).
+        """
+        pass
+
+    @staticmethod
+    def labels(prices: pd.DataFrame, labels: pd.DataFrame) -> pd.DataFrame:
+        """
+        TBD.
+        If only_last is True, return only the last row (1-row DataFrame).
+        """
+        pass
+    
+
 
 #------------------------------------------------------------------------------#
 

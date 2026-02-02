@@ -427,21 +427,36 @@ class Groups:
 
     # TODO
     @staticmethod
-    def none(prices: pd.DataFrame) -> pd.DataFrame:
+    def none(prices: pd.DataFrame, ref_date = None) -> pd.DataFrame:
         """
         TBD.
-        If only_last is True, return only the last row (1-row DataFrame).
+        If ref_date is None, return only labels for the last available date (1-row DataFrame).
         """
-        pass
+        
+        if ref_date is None:
+            ref_date = prices.index.values[[-1]]
+
+        groups = pd.DataFrame(index=ref_date, columns=prices.columns)
+        groups.loc[:, :] = prices.columns
+
+        return groups
+
 
     @staticmethod
-    def labels(prices: pd.DataFrame, labels: pd.DataFrame) -> pd.DataFrame:
+    def labels(labels: pd.DataFrame, ref_date = None) -> pd.DataFrame:
         """
         TBD.
-        If only_last is True, return only the last row (1-row DataFrame).
+        If ref_date is None, return only labels for the last available date (1-row DataFrame).
         """
         pass
     
+    @staticmethod
+    def clustering(prices: pd.DataFrame, ref_date = None, method_specs=None) -> pd.DataFrame:
+        """
+        TBD.
+        
+        """
+        pass
 
 
 #------------------------------------------------------------------------------#

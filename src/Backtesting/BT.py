@@ -429,7 +429,7 @@ class Groups:
     @staticmethod
     def none(prices: pd.DataFrame, ref_date = None) -> pd.DataFrame:
         """
-        TBD.
+        Returns asset names as group labels (each asset forms a group).
         If ref_date is None, return only labels for the last available date (1-row DataFrame).
         """
         
@@ -438,30 +438,83 @@ class Groups:
 
         groups = pd.DataFrame(index=ref_date, columns=prices.columns)
         groups.loc[:, :] = prices.columns
-
         return groups
-
 
     @staticmethod
     def labels(labels: pd.DataFrame, ref_date = None) -> pd.DataFrame:
         """
-        TBD.
+        Returns groups as specified by labels.
         If ref_date is None, return only labels for the last available date (1-row DataFrame).
         """
-        pass
+        if ref_date is None:
+            ref_date = labels.index.values[[-1]]
+
+        return labels.loc[ref_date]
     
+    # TODO: implement this methos
     @staticmethod
     def clustering(prices: pd.DataFrame, ref_date = None, method_specs=None) -> pd.DataFrame:
         """
         TBD.
-        
         """
+        # raise NotImplementedError("Method 'clustering' not implemented yet!")
         pass
-
+        
 
 #------------------------------------------------------------------------------#
 
-class Weights:
+class DailyWeights:
+    """
+    Class to handle daily open, close, and end-of-day weights.
+    Close weights are weights at market close based existing holding and close prices.
+    End-of day weights are weights based on holdings after allocation changes performed at the close.
+    Open weights are weights based on existing holdings at market open and open prices.
+    """
+    def __init__(self):
+        """Instantiate class object"""
+        self.open_weights = None
+        self.close_weights = None
+        self.eod_weights = None
+        self.open_prices = None
+        self.close_prices = None
+
+    @staticmethod
+    def equal_weights(prices: pd.DataFrame) -> pd.DataFrame:
+        """Compute equal weights for assets having prices"""
+        weights = pd.DataFrame(1.0, index = prices.index, columns=prices.columns)
+        weights.mask(prices.isna(), 0.0, inplace=True)
+        return weights.div(prices.count(axis=1), axis=0)
+        
+    @staticmethod
+    def drifting_weights(start_weights: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
+        """Compute drifting weights"""
+
+        assert start_weights.shape[0] == 1
+        assert start_weights.index[0] == prices.index[0]
+
+        rets = prices.pct_change().fillna(0)
+        weights = (1 + rets).cumprod().mul(start_weights.values, axis=1)
+        return weights.div(weights.sum(axis=1), axis=0)
+
+
+    @staticmethod
+    def compute_eod_weights(close_weights: pd.DataFrame, close_prices: pd.DataFrame) -> pd.DataFrame:
+        """Compute end-of-day prices from close weights and close prices."""
+
+        wgt = close_weights.shift(-1) / (close_prices.shift(-1) / close_prices)
+        wgt = wgt.fillna(0)
+        wgt = wgt.div(wgt.sum(axis=1), axis=0)
+
+        eod_weights = pd.DataFrame(index = wgt.index, columns = wgt.columns, dtype=float)
+
+        # eod_weights = close_weights.copy()
+        eod_weights.iloc[:-1, :] = wgt.iloc[:-1, :]
+        return  eod_weights
+
+
+#------------------------------------------------------------------------------#
+# Obsolete classe
+class zzz_Weights:
     def __init__(self):
         """Instantiate class object"""
         pass
@@ -502,7 +555,5 @@ class Weights:
 
         return weights.div(wgt_net, axis=0)
     
-
-
 
 #------------------------------------------------------------------------------#

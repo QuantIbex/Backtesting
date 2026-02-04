@@ -432,7 +432,7 @@ class Signals:
         single_signals = [Signals.compute_single(specs = s, data = data) for s in s_specs]
 
         if len(single_signals) > 1:
-            global_signals = Signals.aggregate(specs = specs["aggregate"], ratings = single_signals)
+            global_signals = Signals.aggregate(specs = specs["aggregate"], signals = single_signals)
         else:
             global_signals = single_signals[0]
 
@@ -460,11 +460,9 @@ class Signals:
         assert isinstance(data, dict), "Input 'data' must be a dict."
 
         if specs["type"].lower() == "top-bottom":
-            pass
-            # return Signals.identity(metrics = data[specs["var_name"]])
-        elif specs["type"].lower() == "rank":
-            pass
-            # return Signals.rank(metrics = data[specs["var_name"]])
+            return Signals.top_bottom(ratings = data[specs["var_name"]],
+                                      top = specs.get("top"),
+                                      bottom = specs.get("bottom"))
         else:
             raise ValueError("Invalid choice of rating type!")
 

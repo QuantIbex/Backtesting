@@ -41,58 +41,64 @@ class TestSignals(unittest.TestCase):
         actual = BT.Signals.top_bottom(ratings = ratings, top = 2, bottom = 1)
         pd.testing.assert_frame_equal(actual, expected)
 
-
-    # CONTINUE DEV FROM HERE
-
-    def test_rating_single(self):
+    def test_signal_single(self):
         """Obvious"""
-
-        inds = pd.date_range(start="2019-12-31", periods=4, freq="ME")
+        inds = pd.date_range(start = "2019-12-31", periods = 4, freq = "ME")
         cols = [f"Asset_{i}" for i in range(1, 6)]
-        vals = np.array([[0, 1, 2, 3, 4], [4, 3, 2, 1, 0], [11, 15, 12, 14, 13], 
+        vals = np.array([[0, 1, 2, 3, 4], [4, 3, 2, 1, 0], [11, 15, 12, 14, 13],
                          [11, 13, 15, np.nan, 12 ] ])
-        rtgs = np.array([[0.0, 0.25, 0.5, 0.75, 1.0], [1.0, 0.75, 0.5, 0.25, 0.0], 
-                         [0.0, 1.0, 0.25, 0.75, 0.5], [0.0, 2/3, 1.0, np.nan, 1/3]])
-        metrics = pd.DataFrame(vals, index=inds, columns=cols)
-        data = {"metrics": metrics}
+        ratings = pd.DataFrame(vals, index=inds, columns=cols)
 
-        # identity
-        specs = {"var_name": "metrics", "type": "identity"}
-        expected = BT.Ratings.identity(metrics = data["metrics"])
-        actual = BT.Ratings.compute_single(specs=specs, data=data)
-        pd.testing.assert_frame_equal(actual, expected)
+        data = {"ratings": ratings}
 
-        # rank
-        specs = {"var_name": "metrics", "type": "rank"}
-        expected = BT.Ratings.rank(metrics = data["metrics"])
-        actual = BT.Ratings.compute_single(specs=specs, data=data)
-        pd.testing.assert_frame_equal(actual, expected)
-
-        # uscore - scaling: n - 1
-        specs = {"var_name": "metrics", "type": "uscore", "scaling": "n-1"}
-        expected = BT.Ratings.uscore(metrics = data["metrics"], scaling=specs["scaling"])
-        actual = BT.Ratings.compute_single(specs=specs, data=data)
-        pd.testing.assert_frame_equal(actual, expected)
-
-        # uscore - scaling: n
-        specs = {"var_name": "metrics", "type": "uscore", "scaling": "n"}
-        expected = BT.Ratings.uscore(metrics = data["metrics"], scaling=specs["scaling"])
-        actual = BT.Ratings.compute_single(specs=specs, data=data)
-        pd.testing.assert_frame_equal(actual, expected)
-
-        # uscore - scaling: n + 1
-        specs = {"var_name": "metrics", "type": "uscore", "scaling": "n+1"}
-        expected = BT.Ratings.uscore(metrics = data["metrics"], scaling=specs["scaling"])
-        actual = BT.Ratings.compute_single(specs=specs, data=data)
-        pd.testing.assert_frame_equal(actual, expected)
-
-        # zscore
-        specs = {"var_name": "metrics", "type": "zscore"}
-        expected = BT.Ratings.zscore(metrics = data["metrics"])
-        actual = BT.Ratings.compute_single(specs=specs, data=data)
+        # top-bottom
+        specs = {"var_name": "ratings", "type": "top-bottom", "top": 1, "bottom": 2}
+        expected = BT.Signals.top_bottom(ratings = data["ratings"], 
+                                         top = specs.get("top"), 
+                                         bottom = specs.get("bottom"))
+        actual = BT.Signals.compute_single(specs=specs, data=data)
         pd.testing.assert_frame_equal(actual, expected)
 
     def test_aggregate(self):
+        """Obvious"""
+
+        def _local_generate_signals(n_periods = 12, n_neg = 2, n_pos = 2, n_0 = 2, seed=1):
+            if False:
+                n_periods = 12
+                n_neg = 2
+                n_pos = 2
+                n_0 = 2
+                seed=1
+            np.random.seed(seed)  # for reproducibility        
+            inds = pd.date_range(start="2019-12-31", periods=n_periods, freq="ME")
+            cols = [f"Asset_{i}" for i in range(1, n_neg + n_0 + n_pos +1)]
+            base = np.array([-1] * n_neg + [0] * n_0 + [1] * n_pos)  #
+
+            sgnls = np.array([np.random.permutation(base) for _ in range(n_periods)])
+            signals = pd.DataFrame(sgnls, index=inds, columns=cols)
+            return signals
+
+        signals = [
+            _local_generate_signals(n_periods = 12, n_neg = 2, n_pos = 2, n_0 = 2, seed = 1),
+            _local_generate_signals(n_periods = 12, n_neg = 2, n_pos = 1, n_0 = 3, seed = 2),
+            _local_generate_signals(n_periods = 12, n_neg = 4, n_pos = 2, n_0 = 0, seed = 3),
+            _local_generate_signals(n_periods = 12, n_neg = 1, n_pos = 2, n_0 = 3, seed = 4)]
+
+
+        # Equally-weighted mean
+        specs = {"method": "mean"}
+        expected = BT.Utils.weighted_mean_dfs(dfs = signals, weights = None)
+        actual = BT.Signals.aggregate(specs = specs, signals = signals)
+        pd.testing.assert_frame_equal(actual, expected)
+
+        # Non-equally-weighted mean
+        wgts = [1, 2, 3, 4]
+        specs = {"method": "mean", "weights": wgts}
+        expected = BT.Utils.weighted_mean_dfs(dfs = signals, weights = wgts) 
+        actual = BT.Signals.aggregate(specs = specs, signals = signals)
+        pd.testing.assert_frame_equal(actual, expected)
+
+    def test_compute___several(self):
         """Obvious"""
 
         def _local_generate_ratings(n_periods = 12, n_assets = 6, seed=1):
@@ -100,59 +106,23 @@ class TestSignals(unittest.TestCase):
                 n_periods = 12
                 n_assets = 6
                 seed=1
-            np.random.seed(seed)  # for reproducibility        
-            inds = pd.date_range(start="2019-12-31", periods=n_periods, freq="ME")
-            cols = [f"Asset_{i}" for i in range(1, n_assets+1)]
-            base = np.arange(1, n_assets + 1)
-            rtgs = np.array([np.random.permutation(base) for _ in range(n_periods)])
-            ratings = pd.DataFrame(rtgs, index=inds, columns=cols)
+            prices = BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=seed)
+            ratings = prices.rank(axis=1)
             return ratings
 
-
-        ratings = [_local_generate_ratings(n_periods = 12, n_assets = 6, seed=1),
-            _local_generate_ratings(n_periods = 12, n_assets = 6, seed=2),
-            _local_generate_ratings(n_periods = 12, n_assets = 6, seed=3),
-            _local_generate_ratings(n_periods = 12, n_assets = 6, seed=4)]
-
-
-        # Equally-weighted mean
-        specs = {"method": "mean"}
-        expected = BT.Utils.weighted_mean_dfs(dfs = ratings, weights = None)
-        actual = BT.Ratings.aggregate(specs = specs, ratings = ratings)
-        pd.testing.assert_frame_equal(actual, expected)
-
-        # Non-equally-weighted mean
-        wgts = [1, 2, 3, 4]
-        specs = {"method": "mean", "weights": wgts}
-        expected = BT.Utils.weighted_mean_dfs(dfs = ratings, weights = wgts) 
-        actual = BT.Ratings.aggregate(specs = specs, ratings = ratings)
-        pd.testing.assert_frame_equal(actual, expected)
-
-    def test_compute___several(self):
-        """Obvious"""
-
-        def _local_generate_metrics(n_periods = 12, n_assets = 6, seed=1):
-            if False:
-                n_periods = 12
-                n_assets = 6
-                seed=1
-            prices = BT.Utils.generate_random_prices(n_periods = 12, n_assets = 6, seed=seed)
-            metrics = prices.pct_change(periods=6)
-            return metrics
-
-        data = {"metrics": _local_generate_metrics(n_periods = 12, n_assets = 6, seed=1)}
-        r_specs_1 = {"var_name": "metrics", "type": "uscore", "scaling": "n-1"}
-        r_specs_2 = {"var_name": "metrics", "type": "uscore", "scaling": "n"}
-        r_specs_3 = {"var_name": "metrics", "type": "uscore", "scaling": "n+1"}
+        data = {"ratings": _local_generate_ratings(n_periods = 12, n_assets = 6, seed=1)}
+        s_specs_1 = {"var_name": "ratings", "type": "top-bottom", "top": 2, "bottom": 1}
+        s_specs_2 = {"var_name": "ratings", "type": "top-bottom", "top": 1, "bottom": 2}
+        s_specs_3 = {"var_name": "ratings", "type": "top-bottom", "top": 1, "bottom": 1}
         a_specs = {"method": "mean", "weights": [1, 2, 3]}
-        rat_1 = BT.Ratings.uscore(metrics=data["metrics"], scaling = r_specs_1["scaling"])
-        rat_2 = BT.Ratings.uscore(metrics=data["metrics"], scaling = r_specs_2["scaling"])
-        rat_3 = BT.Ratings.uscore(metrics=data["metrics"], scaling = r_specs_3["scaling"])
-        agg_rat = BT.Ratings.aggregate(specs = a_specs, ratings=[rat_1, rat_2, rat_3])
+        sig_1 = BT.Signals.top_bottom(ratings=data["ratings"], top = s_specs_1["top"], bottom = s_specs_1["bottom"])
+        sig_2 = BT.Signals.top_bottom(ratings=data["ratings"], top = s_specs_2["top"], bottom = s_specs_2["bottom"])
+        sig_3 = BT.Signals.top_bottom(ratings=data["ratings"], top = s_specs_3["top"], bottom = s_specs_3["bottom"])
+        agg_sig = BT.Signals.aggregate(specs = a_specs, signals = [sig_1, sig_2, sig_3])
         
-        specs = {"ratings": [r_specs_1, r_specs_2, r_specs_3], "aggregate": a_specs}
-        expected = {"singles": [rat_1, rat_2, rat_3], "global": agg_rat}
-        actual = BT.Ratings.compute(specs = specs, data = data)
+        specs = {"signals": [s_specs_1, s_specs_2, s_specs_3], "aggregate": a_specs}
+        expected = {"singles": [sig_1, sig_2, sig_3], "global": agg_sig}
+        actual = BT.Signals.compute(specs = specs, data = data)
         self.assertEqual(len(actual["singles"]), 3)
         pd.testing.assert_frame_equal(actual["singles"][0], expected["singles"][0])
         pd.testing.assert_frame_equal(actual["singles"][1], expected["singles"][1])

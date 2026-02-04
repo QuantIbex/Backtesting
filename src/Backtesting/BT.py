@@ -222,7 +222,7 @@ class Metrics:
     @staticmethod
     def compute_single(specs: list, data: dict) -> pd.DataFrame:
         """
-        Compute single metric
+        Compute a single metric
         """
         assert isinstance(specs, dict), "Input 'specs' must be a dict."
         assert isinstance(data, dict), "Input 'data' must be a dict."
@@ -354,7 +354,7 @@ class Ratings:
     @staticmethod
     def compute_single(specs: list, data: dict) -> pd.DataFrame:
         """
-        Compute single rating
+        Compute a single rating
         """
         assert isinstance(specs, dict), "Input 'specs' must be a dict."
         assert isinstance(data, dict), "Input 'data' must be a dict."
@@ -415,6 +415,86 @@ class Signals:
     def __init__(self):
         """Instantiate class object"""
         pass
+
+    @staticmethod
+    def compute(specs: dict, data: dict) -> dict:
+                
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(data, dict), "Input 'data' must be a dict."
+
+        if isinstance(specs["signals"], dict):
+            s_specs = [specs["signals"]]
+        elif isinstance(specs["signals"], list):
+            s_specs = specs["signals"]
+        else:
+            raise TypeError("Element 'signals' of input 'specs' must be a list or a dict!")
+
+        single_signals = [Signals.compute_single(specs = s, data = data) for s in s_specs]
+
+        if len(single_signals) > 1:
+            global_signals = Signals.aggregate(specs = specs["aggregate"], ratings = single_signals)
+        else:
+            global_signals = single_signals[0]
+
+        return {"singles": single_signals, "global": global_signals}
+
+    @staticmethod
+    def aggregate(specs: dict, signals: list) -> pd.DataFrame:
+        """
+        Aggregate several signals
+        """
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(signals, list), "Input 'signals' must be a list."
+
+        if specs["method"].lower() == "mean":
+            return Utils.weighted_mean_dfs(dfs = signals, weights = specs.get("weights"))
+        else:
+            raise ValueError("Invalid choice of aggregation method!")
+
+    @staticmethod
+    def compute_single(specs: list, data: dict) -> pd.DataFrame:
+        """
+        Compute a single signal
+        """
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(data, dict), "Input 'data' must be a dict."
+
+        if specs["type"].lower() == "top-bottom":
+            pass
+            # return Signals.identity(metrics = data[specs["var_name"]])
+        elif specs["type"].lower() == "rank":
+            pass
+            # return Signals.rank(metrics = data[specs["var_name"]])
+        else:
+            raise ValueError("Invalid choice of rating type!")
+
+    @staticmethod
+    def top_bottom(ratings: pd.DataFrame, top: int = 0, bottom: int = 0) -> pd.DataFrame:
+        """Compute signals based on the top-bottom approach"""
+
+        if top is None:
+            top = 0
+        else:
+            assert isinstance(top, int), "Input 'top' must be an 'int'"
+            
+        if bottom is None:
+            bottom = 0
+        else:
+            assert isinstance(bottom, int), "Input 'bottom' must be an 'int'"
+        
+        assert all(top + bottom <= ratings.count(axis=1)), \
+            "The sum of inputs 'top' and 'bottom' must be less or equal to the number of available ratings"
+
+        signals = pd.DataFrame(0.0, index = ratings.index, columns=ratings.columns)
+        if top > 0:
+            is_long = ratings.rank(axis=1, ascending=False) <= top
+            signals[is_long] = 1.0
+        if bottom > 0:
+            is_short = ratings.rank(axis=1, ascending=True) <= bottom
+            signals[is_short] = -1.0
+
+        return signals
+
 
 #------------------------------------------------------------------------------#
 

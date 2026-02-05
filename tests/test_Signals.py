@@ -1,6 +1,6 @@
 #%%
 """
-Test suite for class BT.Ratings
+Test suite for class BT.Signals
 
 Execute tests in consol with:
     pdm run python -m unittest discover -s tests

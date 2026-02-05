@@ -409,7 +409,6 @@ class Ratings:
 
 #------------------------------------------------------------------------------#
 
-# TODO: implement all methods for this class
 class Signals:
     """Class to compute and handle signals"""
     def __init__(self):
@@ -492,6 +491,80 @@ class Signals:
             signals[is_short] = -1.0
 
         return signals
+
+#------------------------------------------------------------------------------#
+
+class Weightings:
+    """Class to compute and handle weightings"""
+    def __init__(self):
+        """Instantiate class object"""
+        pass
+
+    @staticmethod
+    def compute(specs: dict, data: dict) -> dict:
+                
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(data, dict), "Input 'data' must be a dict."
+
+        if isinstance(specs["weightings"], dict):
+            w_specs = [specs["weightings"]]
+        elif isinstance(specs["weightings"], list):
+            w_specs = specs["weightings"]
+        else:
+            raise TypeError("Element 'weightings' of input 'specs' must be a list or a dict!")
+
+        single_weightings = [Weightings.compute_single(specs = s, data = data) for s in w_specs]
+
+        if len(single_weightings) > 1:
+            global_weightings = Weightings.aggregate(specs = specs["aggregate"], weightings = single_weightings)
+        else:
+            global_weightings = single_weightings[0]
+
+        return {"singles": single_weightings, "global": global_weightings}
+
+    @staticmethod
+    def aggregate(specs: dict, weightings: list) -> pd.DataFrame:
+        """
+        Aggregate several weightings
+        """
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(weightings, list), "Input 'signals' must be a list."
+
+        if specs["method"].lower() == "mean":
+            return Utils.weighted_mean_dfs(dfs = weightings, weights = specs.get("weights"))
+        else:
+            raise ValueError("Invalid choice of aggregation method!")
+
+    @staticmethod
+    def compute_single(specs: list, data: dict) -> pd.DataFrame:
+        """
+        Compute a single weighting
+        """
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(data, dict), "Input 'data' must be a dict."
+
+        if specs["type"].lower() == "equally-weighted":
+            return Weightings.equally_weighted(signals = data[specs["var_name"]])
+        else:
+            raise ValueError("Invalid choice of weighting type!")
+
+    @staticmethod
+    def equally_weighted(signals: pd.DataFrame) -> pd.DataFrame:
+        """Compute weightings based on the equally-weighted approach"""
+        
+        longs = pd.DataFrame(0.0, index = signals.index, columns = signals.columns)
+        mask_long = signals > 0
+        if mask_long.any(axis=None):
+            longs[mask_long] = 1
+            longs = longs.div(longs.sum(axis=1), axis=0).fillna(0)
+        
+        shorts = pd.DataFrame(0.0, index = signals.index, columns = signals.columns)
+        mask_short = signals < 0
+        if mask_short.any(axis=None):
+            shorts[mask_short] = -1
+            shorts = shorts.div(-shorts.sum(axis=1), axis=0).fillna(0)
+
+        return longs + shorts
 
 
 #------------------------------------------------------------------------------#

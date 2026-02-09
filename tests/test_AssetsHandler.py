@@ -1,0 +1,108 @@
+#%%
+"""
+Test suite for class BT.Grops
+
+Execute tests in consol with:
+    pdm run python -m unittest discover -s tests
+    
+"""
+
+import unittest
+import numpy as np
+import pandas as pd
+from Backtesting import BT
+
+
+class TestAssetsHandler(unittest.TestCase):
+    """Obvious"""
+
+    def test_rebase_prices(self):
+        """Obvious"""
+        start_val = 200
+        strt = np.array([[100, 200, 300, 400]])
+        raw_prices = BT.Utils.generate_random_prices(n_periods = 12, n_assets = len(strt[0]), seed = 1)        
+        growth_factor = (1 + raw_prices.pct_change().fillna(0)).cumprod()
+        prices = growth_factor.mul(strt)
+
+        expected = start_val * growth_factor 
+        actual = BT.AssetsHandler.rebase_prices(prices = prices, start_value = start_val)
+        pd.testing.assert_frame_equal(actual, expected)
+
+    def test_single_period_buy_and_hold_portfolio_prices___defaults(self):
+        """Obvious"""
+        wgts = [[1, 2, 3, 4]]
+        prices = BT.Utils.generate_random_prices(n_periods = 12, n_assets = len(wgts[0]), seed = 1)
+        weights = pd.DataFrame(wgts, index = prices.index[[0]], columns=prices.columns)
+        
+        expected = BT.AssetsHandler.single_period_buy_and_hold_portfolio_prices(
+            weights = weights, prices = prices, start_value = 100)
+        actual = BT.AssetsHandler.single_period_buy_and_hold_portfolio_prices(
+            weights = weights, prices = prices)
+        pd.testing.assert_frame_equal(actual, expected)
+
+    def test_single_period_buy_and_hold_portfolio_prices(self):
+        """Obvious"""
+        start_val = 200
+        wgts = [[1, 2, 3, 4]]
+        prices = BT.Utils.generate_random_prices(n_periods = 12, n_assets = len(wgts[0]), seed = 1)
+        weights = pd.DataFrame(wgts, index = prices.index[[0]], columns=prices.columns)
+
+        px = prices.values / np.tile(prices.values[0, :], (prices.shape[0], 1))
+        norm_wgts = weights.values / weights.values.sum()
+        px = px * np.tile(norm_wgts, (prices.shape[0], 1))
+        px = start_val * np.sum(px, axis = 1)
+        expected = pd.DataFrame(px, index = prices.index, columns=["Portfolio"])
+        actual = BT.AssetsHandler.single_period_buy_and_hold_portfolio_prices(
+            weights = weights, prices = prices, start_value = start_val)
+        pd.testing.assert_frame_equal(actual, expected)
+
+    def test_single_period_buy_and_hold_asset_groups_prices___defaults(self):
+        """Obvious"""
+
+        wgts = [[1, 3, 3, 5, 10]]
+        prices = BT.Utils.generate_random_prices(n_periods = 12, n_assets = len(wgts[0]), seed = 1)        
+        weights = pd.DataFrame(wgts, index = prices.index[[0]], columns=prices.columns)
+
+        expected = BT.AssetsHandler.single_period_buy_and_hold_asset_groups_prices(
+            prices = prices, weights = weights, groups = None, start_value=100)
+        actual = BT.AssetsHandler.single_period_buy_and_hold_asset_groups_prices(
+            prices = prices, weights = weights)
+        pd.testing.assert_frame_equal(actual, expected)
+
+    def test_single_period_buy_and_hold_asset_groups_prices(self):
+        """Obvious"""
+        start_val = 200
+        wgts = [[1, 3, 3, 5, 10]]
+        grps = [["A", "A", "B", "B", "C"]]
+        prices = BT.Utils.generate_random_prices(n_periods = 12, n_assets = len(wgts[0]), seed = 1)        
+        weights = pd.DataFrame(wgts, index = prices.index[[0]], columns=prices.columns)
+        groups =  pd.DataFrame(grps, index = prices.index[[0]], columns=prices.columns)
+
+        # Several groups
+        reb_prices = prices.div(prices.iloc[0, :], axis=1)
+        grp_1_prices = (weights["Asset_1"].values * reb_prices["Asset_1"] \
+            + weights["Asset_2"].values * reb_prices["Asset_2"]) / weights[["Asset_1", "Asset_2"]].values.sum()
+        grp_2_prices = (weights["Asset_3"].values * reb_prices["Asset_3"] \
+            + weights["Asset_4"].values * reb_prices["Asset_4"]) / weights[["Asset_3", "Asset_4"]].values.sum()
+        grp_3_prices = reb_prices["Asset_5"]
+
+        expected = start_val * pd.concat([grp_1_prices, grp_2_prices, grp_3_prices], axis=1, keys=["A", "B", "C"])
+        actual = BT.AssetsHandler.single_period_buy_and_hold_asset_groups_prices(
+            groups = groups, weights = weights, prices = prices, start_value = start_val)
+        pd.testing.assert_frame_equal(actual, expected)
+
+        # Single group
+        groups_2 = pd.DataFrame("Z", index = prices.index[[0]], columns=prices.columns)
+        ptf_prices = BT.AssetsHandler.single_period_buy_and_hold_portfolio_prices(
+            weights=weights, prices=prices, start_value=start_val)
+        expected = ptf_prices.rename(columns={"Portfolio": "Z"})
+        actual = BT.AssetsHandler.single_period_buy_and_hold_asset_groups_prices(
+            groups = groups_2, weights = weights, prices = prices, start_value = start_val)
+        pd.testing.assert_frame_equal(actual, expected)
+
+
+
+
+
+if __name__ == "__main__":
+    unittest.main()

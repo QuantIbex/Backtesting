@@ -129,6 +129,5 @@ class TestWeightings(unittest.TestCase):
         pd.testing.assert_frame_equal(actual["singles"][2], expected["singles"][2])
         pd.testing.assert_frame_equal(actual["global"], expected["global"])
 
-
 if __name__ == "__main__":
     unittest.main()

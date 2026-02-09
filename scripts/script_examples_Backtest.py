@@ -127,6 +127,8 @@ group_signals = {
     "group_sig_6-12_0":{}
 }
 
+group_weightings = {}
+
 
 if False:
     asset_metrics = {

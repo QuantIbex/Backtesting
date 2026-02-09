@@ -118,22 +118,81 @@ class Utils:
         return pd.DataFrame(wm, index=dfs[0].index, columns=dfs[0].columns)
 
 
-    # TODO: add unit tests
-    # TODO: move this to a portfolio dedicated class
-    # TODO: allow grouping at sub-portfolio level (to compute sub-portfolio prices)? 
+#------------------------------------------------------------------------------#
+
+class AssetsHandler:
+    """
+    Class to handle asset prices and returns, and aggregates groups asset 
+    into portfolios using weights and group specifications.
+    """
+    def __init__(self):
+        """Instantiate class object"""
+        pass
+
+
     @staticmethod
-    def compute_buy_and_hold_portfolio_prices(weights, asset_prices, start_value=100):
-        """Compute the price of a buy-and-hold portfolio"""
+    def rebase_prices(prices: pd.DataFrame, start_value: float = 100) -> pd.DataFrame:
+        """Computes rebased prices"""
 
-        print("Unit tests are missing for 'Utils.compute_buy_and_hold_portfolio_prices'")
+        return start_value * prices.div(prices.iloc[0, :], axis=1)
 
-        assert weights.shape[0] == 1
-        assert (weights.sum(axis=1) - 1).abs().values < 1-e-12
-        assert weights.index[0] == asset_prices.index[0]
-        assert all(weights.columns == asset_prices.columns)
 
-        return start_value * asset_prices(asset_prices.iloc[0, :]).mul(weights.values).sum(axis=1)
-                
+    @staticmethod
+    def single_period_buy_and_hold_portfolio_prices(
+            prices: pd.DataFrame, weights: pd.DataFrame, 
+            start_value: float = 100) -> pd.Series:
+        """Compute the price of a buy-and-hold portfolio for a single period, that is without rebalancing"""
+
+        assert weights.shape[0] == 1, "Input 'weights' must have only 1 row."
+        assert weights.index[0] == prices.index[0], \
+            "Input 'weights'' date must correspond to the first date of in put 'asset_prices'"
+        assert all(weights.columns == prices.columns), \
+            "Columns of inputs 'weights' and 'asset_prices' must match exactly."
+        
+        rebased_prices = AssetsHandler.rebase_prices(prices = prices, start_value = start_value)
+        norm_wghts = weights.values / weights.values.sum()
+
+        ptf_prices = rebased_prices.mul(norm_wghts, axis=1).sum(axis=1).to_frame(name="Portfolio")
+        return ptf_prices
+    
+
+    @staticmethod
+    def single_period_buy_and_hold_asset_groups_prices(
+            prices: pd.DataFrame, weights: pd.DataFrame,
+            groups: pd.DataFrame = None, start_value: float = 100) -> pd.DataFrame:
+        """Compute prices of buy-and-hold asset groups for a single period, that is without rebalancing"""
+
+        if groups is None:
+            return AssetsHandler.single_period_buy_and_hold_portfolio_prices(
+                weights=weights, prices = prices, start_value = start_value)
+        else:
+            assert weights.shape[0] == 1, "Input 'weights' must have only 1 row."
+            assert weights.index[0] == prices.index[0], \
+                "Input 'weights'' date must correspond to the first date of in put 'prices'"
+            assert all(weights.columns == prices.columns), \
+                "Columns of inputs 'weights' and 'asset_prices' must match exactly."
+
+            p_reb = AssetsHandler.rebase_prices(prices = prices, start_value = start_value)
+            w_ser = weights.iloc[0]
+            g_ser = groups.iloc[0]
+            grp_sums = w_ser.groupby(g_ser).sum()
+            w_reb = w_ser / grp_sums.loc[g_ser.values].values
+
+            df = (p_reb * w_reb).T
+            df.insert(0, "Group", g_ser)
+            group_prices = df.groupby("Group").sum().T
+            group_prices.index = prices.index
+            group_prices.columns.name = None
+            return group_prices
+
+
+    @staticmethod
+    def buy_and_hold_prices(
+            asset_prices: pd.DataFrame, weights: pd.DataFrame, groups: pd.DataFrame = None,  \
+                start_value: float = 100) -> pd.DataFrame:
+        """Compute prices of buy-and-hold asset groups, with potential rebalancings"""
+
+
 #------------------------------------------------------------------------------#
 
 class Metrics:
@@ -576,7 +635,12 @@ class Groups:
         pass
     
 
-    # TODO
+    @staticmethod
+    def compute_prices(asset_prices: pd.DataFrame, asset_labels: pd.DataFrame) -> pd.DataFrame:
+        """Computes groups' historical prices"""
+
+        pass
+
     @staticmethod
     def none(prices: pd.DataFrame, ref_date = None) -> pd.DataFrame:
         """

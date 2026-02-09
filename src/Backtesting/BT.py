@@ -136,7 +136,6 @@ class AssetsHandler:
 
         return start_value * prices.div(prices.iloc[0, :], axis=1)
 
-
     @staticmethod
     def single_period_buy_and_hold_portfolio_prices(
             prices: pd.DataFrame, weights: pd.DataFrame, 
@@ -155,7 +154,6 @@ class AssetsHandler:
         ptf_prices = rebased_prices.mul(norm_wghts, axis=1).sum(axis=1).to_frame(name="Portfolio")
         return ptf_prices
     
-
     @staticmethod
     def single_period_buy_and_hold_asset_groups_prices(
             prices: pd.DataFrame, weights: pd.DataFrame,
@@ -185,12 +183,39 @@ class AssetsHandler:
             group_prices.columns.name = None
             return group_prices
 
-
     @staticmethod
     def buy_and_hold_prices(
-            asset_prices: pd.DataFrame, weights: pd.DataFrame, groups: pd.DataFrame = None,  \
+            prices: pd.DataFrame, weights: pd.DataFrame, groups: pd.DataFrame = None,  \
                 start_value: float = 100) -> pd.DataFrame:
         """Compute prices of buy-and-hold asset groups, with potential rebalancings"""
+
+        # assert all([dt in groups.index.values for dt in weights.index.values])
+
+        rebal_dates = weights.index.sort_values()
+        grp_rets_lst = [None] * len(rebal_dates)
+        for ii, dt in enumerate(rebal_dates):
+            # ii = 1
+            # dt = weights.index[ii]
+            ii_start = dt
+            ii_end = rebal_dates[ii + 1] if ii + 1 < len(rebal_dates) else prices.index[-1]
+
+            if ii_start < ii_end:
+                ii_mask = (ii_start <= prices.index) & (prices.index <= ii_end)
+                ii_prices = prices.loc[ii_mask]
+                ii_weights = weights.loc[[ii_start]]
+                ii_groups = None if groups is None else groups.loc[[ii_start]]
+
+                ii_grp_prices = AssetsHandler.single_period_buy_and_hold_asset_groups_prices(
+                    prices = ii_prices, weights = ii_weights, groups = ii_groups)
+
+                if ii == 0:
+                    grp_rets_lst[ii] = ii_grp_prices.pct_change()
+                else:
+                    grp_rets_lst[ii] = ii_grp_prices.pct_change().iloc[1:, :]
+            
+        grp_rets = pd.concat(grp_rets_lst, axis=0).fillna(0)
+        return start_value * (1 + grp_rets).cumprod()
+
 
 
 #------------------------------------------------------------------------------#

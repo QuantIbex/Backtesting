@@ -11,21 +11,18 @@ from Backtesting import BT
 
 # %% Functions to generate toy data and specs
 def _generate_toy_data():
-    sctr = np.array(
-        [["A"]*25, 
-        ["A"]*25, 
-        ["A"]*13 + ["B"]*12, 
-        ["B"]*25,
-        ["B"]*19 + ["C"]*6, 
-        ]).T
-
-    cntry = np.array(
-        [["Germany"]*25, 
-        ["Germany"]*25, 
-        ["Germany"]*13 + ["France"]*12,
-        ["France"]*25,
-        ["France"]*19 + ["Italy"]*6,
-        ]).T
+    sctr = np.concatenate([
+        np.tile(["A"], (25, 5)),
+        np.tile(["B"], (25, 5)),
+        np.tile(["C"], (25, 5)),
+        np.tile(["D"], (25, 5)),
+        np.tile(["E"], (25, 5))], axis=1)
+    cntry = np.concatenate([
+        np.tile(["Germany"], (25, 4)),
+        np.tile(["France"], (25, 6)),
+        np.tile(["Italy"], (25, 4)),
+        np.tile(["Spain"], (25, 6)),
+        np.tile(["Portugal"], (25, 5))], axis=1)
 
     bench_wgts =  np.random.rand(cntry.shape[0], cntry.shape[1])        # uniform in [0, 1]
     bench_wgts /= bench_wgts.sum(axis=1, keepdims=True)                 # normalize rows to sum to 1.0
@@ -98,36 +95,49 @@ def _generate_toy_specs():
         }
 
     group_metrics = {
-        "group_mom_6_0": {
-            "type": "momentum",
-            "var_name": "sector_group_prices",
-            "lookback": 6,
-            "skip": 0,
-            "res_name_metric": ""},
-        "group_mom_12_0": {
-            "type": "momentum",
-            "var_name": "sector_group_prices",
-            "lookback": 12,
-            "skip": 0,
-            "res_name_metric": ""}
+        "mom_6_0": {
+            "metrics": {
+                "type": "momentum",
+                "var_name": "sector_groups_prices",
+                "lookback": 6,
+                "skip": 0},
+            "res_name": "group_metric_mom_6_0"
+            },
+        "mom_12_0": {
+            "metrics": {
+                "type": "momentum",
+                "var_name": "sector_groups_prices",
+                "lookback": 12,
+                "skip": 0},
+            "res_name": "group_metric_mom_12_0"
+        }
     }
 
     group_ratings = {
-        "group_rat_6-12_0": {
+        "uscore_6-12_0": {
             "ratings": [
-                    {"var_name": "group_mom_6_0", "type": "uscore", "scaling": "n+1"},
-                    {"var_name": "group_mom_12_0", "type": "uscore", "scaling": "n+1"}
+                    {"var_name": "group_metric_mom_6_0", "type": "uscore", "scaling": "n+1"},
+                    {"var_name": "group_metric_mom_12_0", "type": "uscore", "scaling": "n+1"}
                 ], 
-            "aggregate": {"method": "mean"}
+            "aggregate": {"method": "mean"},
+            "res_name": "group_rating_uscore_6-12_0"
             }
 
     }
 
     group_signals = {
-        "group_sig_6-12_0":{}
+        "top-bottom_2-2":{
+            "signals":{"var_name": "group_rating_uscore_6-12_0", "type": "top-bottom", "top": 2, "bottom": 2},
+            "res_name": "group_signal_top-bottom_2-2"
+        }
     }
 
-    group_weightings = {}
+    group_weightings = {
+        "ew":{
+            "weightings": {"var_name": "group_signal_top-bottom_2-2", "type": "equally-weighted"},
+            "res_name": "group_weighting_ew"
+        }
+    }
 
 
     if False:
@@ -196,15 +206,58 @@ for ii, ii_dt in enumerate(trading_days):
     ii_datastore["bench_weights"] = ii_bench_weights
 
     # Form groups
-    for jj, jj_specs in specs["asset_groups"]:
-        # jj = 0
+    print("Forming groups...", end = " ")
+    for jj_specs in specs["asset_groups"].values():
+        # jj = 1
         # jj_specs = list(specs["asset_groups"].values())[jj]
 
-        jj_asset_groups_labels = BT.Groups.compute(data=ii_datastore, specs=jj_specs)
-        # jj_asset_groups_prices = BT.AssetsHandler.buy_and_hold_prices
+        jj_asset_groups_labels = BT.Groups.compute(data = ii_datastore, specs = jj_specs)
+        jj_g_labls = jj_asset_groups_labels.rename({ii_dt: ii_prices.index[0]})
+        jj_b_wgts = ii_bench_weights.rename({ii_dt: ii_prices.index[0]})
+
+        jj_asset_groups_prices = BT.AssetsHandler.fixed_weights_groups_prices(
+            prices = ii_prices, weights = jj_b_wgts, groups = jj_g_labls)
         
         ii_datastore[jj_specs["res_name_asset_group_labels"]] = jj_asset_groups_labels
         ii_datastore[jj_specs["res_name_asset_group_prices"]] = jj_asset_groups_prices
+    print("Done.")
 
+    # Compute group metrics
+    print("Computing metrics...", end = " ")
+    for jj_specs in specs["group_metrics"].values():
+        # jj = 1
+        # jj_specs = list(specs["group_metrics"].values())[jj]
 
+        jj_res = BT.Metrics.compute(specs = jj_specs, data = ii_datastore)
+        ii_datastore[jj_specs["res_name"]] = jj_res["global"]
+    print("Done.")
 
+    # Compute group ratings
+    print("Computing ratings...", end = " ")
+    for jj_specs in specs["group_ratings"].values():
+        # jj = 0
+        # jj_specs = list(specs["group_ratings"].values())[jj]
+
+        jj_res = BT.Ratings.compute(specs = jj_specs, data = ii_datastore)
+        ii_datastore[jj_specs["res_name"]] = jj_res["global"]
+    print("Done.")
+
+    # Compute group signals
+    print("Computing signals...", end = " ")
+    for jj_specs in specs["group_signals"].values():
+        # jj = 0
+        # jj_specs = list(specs["group_signals"].values())[jj]
+
+        jj_res = BT.Signals.compute(specs = jj_specs, data = ii_datastore)
+        ii_datastore[jj_specs["res_name"]] = jj_res["global"]
+    print("Done.")
+
+    # Compute group weightings
+    print("Computing weightings...", end = " ")
+    for jj_specs in specs["group_weightings"].values():
+        # jj = 0
+        # jj_specs = list(specs["group_weightings"].values())[jj]
+
+        jj_res = BT.Weightings.compute(specs = jj_specs, data = ii_datastore)
+        ii_datastore[jj_specs["res_name"]] = jj_res["global"]
+    print("Done.")

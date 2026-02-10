@@ -218,7 +218,7 @@ class AssetsHandler:
 
     @staticmethod
     def single_period_fixed_weights_groups_prices(
-            prices: pd.DataFrame, weights: pd.DataFrame, 
+            prices: pd.DataFrame, weights: pd.DataFrame,
             groups: pd.DataFrame = None, start_value: float = 100) -> pd.DataFrame:
         """
         Compute prices of fixed-weights asset groups for a single period, that is
@@ -272,7 +272,7 @@ class AssetsHandler:
         rebal_dates = weights.index.sort_values()
         grp_rets_lst = [None] * len(rebal_dates)
         for ii, dt in enumerate(rebal_dates):
-            # ii = 1
+            # ii = 0
             # dt = weights.index[ii]
             ii_start = dt
             ii_end = rebal_dates[ii + 1] if ii + 1 < len(rebal_dates) else prices.index[-1]

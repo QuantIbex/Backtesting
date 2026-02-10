@@ -217,7 +217,6 @@ class AssetsHandler:
         return start_value * (1 + grp_rets).cumprod()
 
 
-
 #------------------------------------------------------------------------------#
 
 class Metrics:
@@ -659,12 +658,21 @@ class Groups:
         """Instantiate class object"""
         pass
     
-
     @staticmethod
-    def compute_prices(asset_prices: pd.DataFrame, asset_labels: pd.DataFrame) -> pd.DataFrame:
-        """Computes groups' historical prices"""
+    def compute(specs: dict, data: dict) -> dict:
+                
+        assert isinstance(specs, dict), "Input 'specs' must be a dict."
+        assert isinstance(data, dict), "Input 'data' must be a dict."
 
-        pass
+        if specs["type"].lower() == "none":
+            return Groups.none(prices = data[specs["var_name"]], ref_date = specs.get("ref_date"))
+        elif specs["type"].lower() == "labels":
+            return Groups.labels(labels=data[specs["var_name"]], ref_date = specs.get("ref_date"))
+        elif specs["type"].lower() == "clustering":
+            return Groups.clustering(prices=data[specs["var_name"]], ref_date = specs.get("ref_date"))
+        else:
+            raise ValueError("Invalid choice of weighting type!")
+
 
     @staticmethod
     def none(prices: pd.DataFrame, ref_date = None) -> pd.DataFrame:
@@ -697,8 +705,8 @@ class Groups:
         """
         TBD.
         """
-        # raise NotImplementedError("Method 'clustering' not implemented yet!")
-        pass
+        raise NotImplementedError("Method 'clustering' not implemented yet!")
+        
         
 
 #------------------------------------------------------------------------------#

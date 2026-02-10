@@ -129,7 +129,6 @@ class AssetsHandler:
         """Instantiate class object"""
         pass
 
-
     @staticmethod
     def rebase_prices(prices: pd.DataFrame, start_value: float = 100) -> pd.DataFrame:
         """Computes rebased prices"""
@@ -166,9 +165,9 @@ class AssetsHandler:
         else:
             assert weights.shape[0] == 1, "Input 'weights' must have only 1 row."
             assert weights.index[0] == prices.index[0], \
-                "Input 'weights'' date must correspond to the first date of in put 'prices'"
+                "Input 'weights'' date must correspond to the first date of input 'prices'"
             assert all(weights.columns == prices.columns), \
-                "Columns of inputs 'weights' and 'asset_prices' must match exactly."
+                "Columns of inputs 'weights' and 'prices' must match exactly."
 
             p_reb = AssetsHandler.rebase_prices(prices = prices, start_value = start_value)
             w_ser = weights.iloc[0]
@@ -184,12 +183,13 @@ class AssetsHandler:
             return group_prices
 
     @staticmethod
-    def buy_and_hold_prices(
+    def buy_and_hold_groups_prices(
             prices: pd.DataFrame, weights: pd.DataFrame, groups: pd.DataFrame = None,  \
                 start_value: float = 100) -> pd.DataFrame:
         """Compute prices of buy-and-hold asset groups, with potential rebalancings"""
 
-        # assert all([dt in groups.index.values for dt in weights.index.values])
+        if groups is not None:
+            assert all(groups.index.values == weights.index.values)
 
         rebal_dates = weights.index.sort_values()
         grp_rets_lst = [None] * len(rebal_dates)
@@ -206,6 +206,84 @@ class AssetsHandler:
                 ii_groups = None if groups is None else groups.loc[[ii_start]]
 
                 ii_grp_prices = AssetsHandler.single_period_buy_and_hold_asset_groups_prices(
+                    prices = ii_prices, weights = ii_weights, groups = ii_groups)
+
+                if ii == 0:
+                    grp_rets_lst[ii] = ii_grp_prices.pct_change()
+                else:
+                    grp_rets_lst[ii] = ii_grp_prices.pct_change().iloc[1:, :]
+            
+        grp_rets = pd.concat(grp_rets_lst, axis=0).fillna(0)
+        return start_value * (1 + grp_rets).cumprod()
+
+    @staticmethod
+    def single_period_fixed_weights_groups_prices(
+            prices: pd.DataFrame, weights: pd.DataFrame, 
+            groups: pd.DataFrame = None, start_value: float = 100) -> pd.DataFrame:
+        """
+        Compute prices of fixed-weights asset groups for a single period, that is
+        without weight change
+        """
+
+        assert weights.shape[0] == 1, "Input 'weights' must have only 1 row."
+        assert weights.index[0] == prices.index[0], \
+            "Input 'weights'' date must correspond to the first date of input 'prices'"
+        assert all(weights.columns == prices.columns), \
+            "Columns of inputs 'weights' and 'prices' must match exactly."
+
+        if groups is None:
+            groups = pd.DataFrame("Portfolio", index = prices.index[[0]], columns = prices.columns)
+        else:
+            assert groups.shape[0] == 1, "Input 'groups' must have only 1 row."        
+            assert groups.index[0] == prices.index[0], \
+                "Input 'groups'' date must correspond to the first date of input 'prices'"
+            assert all(groups.columns == prices.columns), \
+                "Columns of inputs 'groups' and 'prices' must match exactly."
+
+        # Prepare dataframes
+        wghts = weights.reindex(index = prices.index, method = "ffill").shift(1)
+        grps = groups.reindex(index = prices.index, method = "ffill").shift(1)
+        rets = prices.pct_change().fillna(0)
+
+        # Compute groups weighted returns
+        weights_tot = wghts.T.groupby(grps.iloc[1]).sum().T
+        weighted_ret = (wghts * rets).T.groupby(grps.iloc[1]).sum().T
+        weighted_ret = (weighted_ret / weights_tot).fillna(0)
+        
+        # Compute group prices
+        groups_prices = start_value * (1 + weighted_ret).cumprod()
+        groups_prices.columns.name = None
+
+        return groups_prices
+    
+    # TODO: very similar version to buy-and-hold. Create helper function to avoid duplicate code 
+    @staticmethod
+    def fixed_weights_groups_prices(
+            prices: pd.DataFrame, weights: pd.DataFrame, 
+            groups: pd.DataFrame = None, start_value: float = 100) -> pd.DataFrame:
+        """
+        Compute prices of fixed-weights asset groups for several periods, that is
+        with potential rebalancings
+        """
+
+        if groups is not None:
+            assert all(groups.index.values == weights.index.values)
+
+        rebal_dates = weights.index.sort_values()
+        grp_rets_lst = [None] * len(rebal_dates)
+        for ii, dt in enumerate(rebal_dates):
+            # ii = 1
+            # dt = weights.index[ii]
+            ii_start = dt
+            ii_end = rebal_dates[ii + 1] if ii + 1 < len(rebal_dates) else prices.index[-1]
+
+            if ii_start < ii_end:
+                ii_mask = (ii_start <= prices.index) & (prices.index <= ii_end)
+                ii_prices = prices.loc[ii_mask]
+                ii_weights = weights.loc[[ii_start]]
+                ii_groups = None if groups is None else groups.loc[[ii_start]]
+
+                ii_grp_prices = AssetsHandler.single_period_fixed_weights_groups_prices(
                     prices = ii_prices, weights = ii_weights, groups = ii_groups)
 
                 if ii == 0:
@@ -761,7 +839,7 @@ class DailyWeights:
 
 
 #------------------------------------------------------------------------------#
-# Obsolete classe
+# Obsolete class
 class zzz_Weights:
     def __init__(self):
         """Instantiate class object"""

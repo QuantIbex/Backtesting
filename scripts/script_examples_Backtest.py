@@ -88,13 +88,13 @@ def _generate_toy_specs():
         "group_labels_sector": {
             "type": "labels",
             "var_name": "asset_sectors",
-            "res_name_asset_group_label": "asset_sector_groups",
-            "res_name_prices": "sector_group_prices"},
+            "res_name_asset_group_labels": "sector_groups_labels",
+            "res_name_asset_group_prices": "sector_groups_prices"},
         "group_labels_country": {
             "type": "labels",
             "var_name": "asset_countries",  
-            "res_name_asset_group_label": "asset_country_groups",
-            "res_name_prices": "country_group_prices"},
+            "res_name_asset_group_labels": "country_groups_labels",
+            "res_name_asset_group_prices": "country_groups_prices"},
         }
 
     group_metrics = {
@@ -158,11 +158,11 @@ def _generate_toy_specs():
         "group_weightings": group_weightings
     }
 
-
-# %% BACKTESTING PROCEDURE
-
 data = _generate_toy_data()
 specs = _generate_toy_specs()
+
+
+# %% BACKTESTING PROCEDURE
 
 
 start_date = specs["product_specs"]["period"][0]
@@ -190,13 +190,21 @@ for ii, ii_dt in enumerate(trading_days):
     # Apply filters
     # TODO: add filter on available prices (or not)?
 
-    # Form groups
+    ii_datastore["prices"] = ii_prices
+    ii_datastore["asset_sectors"] = ii_asset_sectors
+    ii_datastore["asset_countries"] = ii_asset_countries
+    ii_datastore["bench_weights"] = ii_bench_weights
 
+    # Form groups
     for jj, jj_specs in specs["asset_groups"]:
         # jj = 0
-        # jj_specs
+        # jj_specs = list(specs["asset_groups"].values())[jj]
 
-
+        jj_asset_groups_labels = BT.Groups.compute(data=ii_datastore, specs=jj_specs)
+        # jj_asset_groups_prices = BT.AssetsHandler.buy_and_hold_prices
+        
+        ii_datastore[jj_specs["res_name_asset_group_labels"]] = jj_asset_groups_labels
+        ii_datastore[jj_specs["res_name_asset_group_prices"]] = jj_asset_groups_prices
 
 
 

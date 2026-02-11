@@ -295,11 +295,11 @@ class AssetsHandler:
         return start_value * (1 + grp_rets).cumprod()
 
     @staticmethod
-    def scale_group_weights(weights: pd.DataFrame, groups: pd.DataFrame,
+    def set_group_weights(weights: pd.DataFrame, groups: pd.DataFrame,
                         target_group_weights: pd.DataFrame = None) -> pd.DataFrame:
         """
         Compute new asset weights proportional to original weights such that sector sums 
-        match given sector weights or are tilted by given weights.
+        match given sector weights.
         """
 
         assert weights.shape[0] == 1, "Input 'weights' must have 1 row."
@@ -312,6 +312,7 @@ class AssetsHandler:
         weights = weights.div(weights.sum(axis=1), axis=0)
         target_group_weights = target_group_weights.div(target_group_weights.sum(axis=1), axis=0)
 
+        # Extract series
         w_ser = weights.iloc[0]
         g_ser = groups.iloc[0]
         t_ser = target_group_weights.iloc[0]
@@ -319,14 +320,58 @@ class AssetsHandler:
         # Current group weights
         g_sums = w_ser.groupby(g_ser).sum()
 
-        # Scale factors: target / current for each group        
-        scale_factor = t_ser[g_sums.index] / g_sums        
+        # Scale factors: target / current for each group
+        scale_factor = t_ser[g_sums.index] / g_sums
 
         # New weights: proportional scaling
         new_w_ser = w_ser * scale_factor[g_ser].values
 
         # Convert back to DataFrame
         return pd.DataFrame([new_w_ser], index=weights.index, columns=weights.columns)
+
+
+    @staticmethod
+    def tilt_group_weights(weights: pd.DataFrame, groups: pd.DataFrame,
+                           group_weights_tilts: pd.DataFrame = None, long_only: bool = True) -> pd.DataFrame:
+        """
+        Compute new asset weights by tilting them by given sector weights.
+        """
+
+        assert weights.shape[0] == 1, "Input 'weights' must have 1 row."
+        assert groups.shape[0] == 1, "Input 'groups' must have 1 row."
+        assert group_weights_tilts.shape[0] == 1, "Input 'target_group_weights' must have 1 row."
+        assert all(weights.columns == groups.columns), \
+            "Columns of inputs 'weights' and 'groups' must match exactly."
+        assert (group_weights_tilts.sum(axis=1) == 0.0).all(), "Input 'target_group_weights' must have 1 row."
+
+        # Normalize weights
+        weights = weights.div(weights.sum(axis=1), axis=0)
+
+        # Extract series
+        w_ser = weights.iloc[0]
+        g_ser = groups.iloc[0]
+        t_ser = group_weights_tilts.iloc[0]
+
+        # Current group weights
+        g_sums = w_ser.groupby(g_ser).sum()
+
+        # Target (final) group weights
+        f_ser = g_sums + t_ser
+        if long_only and (f_ser < 0).any():
+            adj_fact = (1 - f_ser / t_ser).loc[f_ser < 0].min()
+            f_ser = g_sums + adj_fact * t_ser
+
+        # Scale factors: target / current for each group
+        scale_factors = f_ser[g_sums.index] / g_sums
+
+        # New weights: proportional scaling
+        new_w_ser = w_ser * scale_factors[g_ser].values
+
+        # Convert back to DataFrame
+        return pd.DataFrame([new_w_ser], index=weights.index, columns=weights.columns)
+
+        
+
 
 #------------------------------------------------------------------------------#
 

@@ -189,7 +189,7 @@ class TestAssetsHandler(unittest.TestCase):
             prices = prices, weights = weights, groups = groups, start_value = start_val)
         pd.testing.assert_frame_equal(actual, expected)
 
-    def test_scale_group_weights(self):
+    def test_set_group_weights___long_only(self):
         """Obvious"""
 
         inds = [pd.to_datetime("2019-12-31")]
@@ -203,12 +203,60 @@ class TestAssetsHandler(unittest.TestCase):
         groups = pd.DataFrame(grps, index=inds, columns=a_cols)
         target_group_weights = pd.DataFrame(tgt_grp_w, index = inds, columns = g_cols)
 
-        expected = pd.DataFrame([[0.025, 0.075, 0.1, 0.3, 0.25, 0.25]], index=weights.index, columns=weights.columns)
-        actual = BT.AssetsHandler.scale_group_weights(weights=weights, groups=groups,
+        expected = pd.DataFrame([[0.025, 0.075, 0.1, 0.3, 0.25, 0.25]], 
+                                index=weights.index, columns=weights.columns)
+        actual = BT.AssetsHandler.set_group_weights(weights=weights, groups=groups,
                                                      target_group_weights=target_group_weights)
+        pd.testing.assert_frame_equal(actual, expected)
+
+    def test_set_group_weights___long_short(self):
+        """Obvious"""
+
+        inds = [pd.to_datetime("2019-12-31")]
+        wgts = [[1, 3, 2, 6, -2, -2]]
+        grps = [["A", "A", "B", "B", "C", "C"]]
+        tgt_grp_w = [[5, -5, 10]]
+        a_cols = [f"Asset_{i}" for i in range(1, len(wgts[0])+1)]
+        g_cols = ["A", "B", "C"]
+
+        weights = pd.DataFrame(wgts, index=inds, columns=a_cols)
+        groups = pd.DataFrame(grps, index=inds, columns=a_cols)
+        target_group_weights = pd.DataFrame(tgt_grp_w, index = inds, columns = g_cols)
+
+        expected = pd.DataFrame([[0.125, 0.375, -0.125, -0.375, 0.5, 0.5]],
+                                index=weights.index, columns=weights.columns)
+        actual = BT.AssetsHandler.set_group_weights(weights=weights, groups=groups,
+                                                     target_group_weights=target_group_weights)
+        pd.testing.assert_frame_equal(actual, expected)
+
+    def test_tilt_group_weights(self):
+        """Obvious"""
+
+        inds = [pd.to_datetime("2019-12-31")]
+        wgts = [[1, 3, 2, 6, 2, 2]]
+        grps = [["A", "A", "B", "B", "C", "C"]]
+        tlt_grp_w = [[-1, -1, 2]]
+        a_cols = [f"Asset_{i}" for i in range(1, len(wgts[0])+1)]
+        g_cols = ["A", "B", "C"]
+
+        weights = pd.DataFrame(wgts, index=inds, columns=a_cols)
+        groups = pd.DataFrame(grps, index=inds, columns=a_cols)
+        group_weights_tilts = pd.DataFrame(tlt_grp_w, index = inds, columns = g_cols)
+
+        long_only = True
+
+        # weights = weights.div(weights.sum(axis=1), axis=0)
+        # weights.iloc[0].groupby(groups.iloc[0]).sum() + group_weights_tilts / 4
+        expected = pd.DataFrame([[0.0, 0.0, 0.0625, 0.1875, 0.375, 0.375]], 
+                                index = weights.index, columns = weights.columns)
+        actual = BT.AssetsHandler.tilt_group_weights(weights = weights, groups = groups,
+                                                     group_weights_tilts = group_weights_tilts,
+                                                     long_only = long_only)
         pd.testing.assert_frame_equal(actual, expected)
 
 
 
 if __name__ == "__main__":
     unittest.main()
+
+# %%

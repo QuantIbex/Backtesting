@@ -189,5 +189,26 @@ class TestAssetsHandler(unittest.TestCase):
             prices = prices, weights = weights, groups = groups, start_value = start_val)
         pd.testing.assert_frame_equal(actual, expected)
 
+    def test_scale_group_weights(self):
+        """Obvious"""
+
+        inds = [pd.to_datetime("2019-12-31")]
+        wgts = [[1, 3, 2, 6, 2, 2]]
+        grps = [["A", "A", "B", "B", "C", "C"]]
+        tgt_grp_w = [[2, 8, 10]]
+        a_cols = [f"Asset_{i}" for i in range(1, len(wgts[0])+1)]
+        g_cols = ["A", "B", "C"]
+
+        weights = pd.DataFrame(wgts, index=inds, columns=a_cols)
+        groups = pd.DataFrame(grps, index=inds, columns=a_cols)
+        target_group_weights = pd.DataFrame(tgt_grp_w, index = inds, columns = g_cols)
+
+        expected = pd.DataFrame([[0.025, 0.075, 0.1, 0.3, 0.25, 0.25]], index=weights.index, columns=weights.columns)
+        actual = BT.AssetsHandler.scale_group_weights(weights=weights, groups=groups,
+                                                     target_group_weights=target_group_weights)
+        pd.testing.assert_frame_equal(actual, expected)
+
+
+
 if __name__ == "__main__":
     unittest.main()

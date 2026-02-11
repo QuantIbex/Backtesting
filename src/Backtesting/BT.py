@@ -294,6 +294,39 @@ class AssetsHandler:
         grp_rets = pd.concat(grp_rets_lst, axis=0).fillna(0)
         return start_value * (1 + grp_rets).cumprod()
 
+    @staticmethod
+    def scale_group_weights(weights: pd.DataFrame, groups: pd.DataFrame,
+                        target_group_weights: pd.DataFrame = None) -> pd.DataFrame:
+        """
+        Compute new asset weights proportional to original weights such that sector sums 
+        match given sector weights or are tilted by given weights.
+        """
+
+        assert weights.shape[0] == 1, "Input 'weights' must have 1 row."
+        assert groups.shape[0] == 1, "Input 'groups' must have 1 row."
+        assert target_group_weights.shape[0] == 1, "Input 'target_group_weights' must have 1 row."
+        assert all(weights.columns == groups.columns), \
+            "Columns of inputs 'weights' and 'groups' must match exactly."
+
+        # Normalize weights
+        weights = weights.div(weights.sum(axis=1), axis=0)
+        target_group_weights = target_group_weights.div(target_group_weights.sum(axis=1), axis=0)
+
+        w_ser = weights.iloc[0]
+        g_ser = groups.iloc[0]
+        t_ser = target_group_weights.iloc[0]
+
+        # Current group weights
+        g_sums = w_ser.groupby(g_ser).sum()
+
+        # Scale factors: target / current for each group        
+        scale_factor = t_ser[g_sums.index] / g_sums        
+
+        # New weights: proportional scaling
+        new_w_ser = w_ser * scale_factor[g_ser].values
+
+        # Convert back to DataFrame
+        return pd.DataFrame([new_w_ser], index=weights.index, columns=weights.columns)
 
 #------------------------------------------------------------------------------#
 

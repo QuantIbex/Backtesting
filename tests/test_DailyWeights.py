@@ -20,7 +20,7 @@ class TestDailyWeights(unittest.TestCase):
         """Obvious"""
         alloc_chg = np.array([[100, 200, 300, 400, 0], [0, 0, 0, 0, 0], [-10, -20, -30, -40, 100],
                               [-10, -20, -30, -40, 100], [0, 0, 0, 0, 0], [10, -20, 30, -40, 20]])
-        close_prices = BT.Utils.generate_random_prices(n_periods=alloc_chg.shape[0] - 1, 
+        close_prices = BT.Utils.generate_random_prices(n_periods=alloc_chg.shape[0], 
                                                        n_assets=alloc_chg.shape[1], seed=1).round()
         
         cls_val = np.zeros((6, 5))

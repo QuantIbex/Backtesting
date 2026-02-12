@@ -65,17 +65,21 @@ class Utils:
         pass
 
     @staticmethod
-    def generate_random_prices(n_periods: int, n_assets: int, seed:int = 0) -> pd.DataFrame:
+    def generate_random_prices(
+            n_periods: int, n_assets: int, 
+            start: str = "2019-12-31", freq: str = "ME", seed: int = 0) -> pd.DataFrame:
         """
         Helper method. Generate a datafram with random prices.
         """
         if False:
             n_periods = 12
             n_assets = 6
+            freq = "ME" # "W-FRI", "BME", "BQE"
+            seed = 0
         np.random.seed(seed)  # for reproducibility        
-        inds = pd.date_range(start="2019-12-31", periods=n_periods + 1, freq="ME")
+        inds = pd.date_range(start = start, periods = n_periods, freq = freq)
         cols = [f"Asset_{i}" for i in range(1, n_assets+1)]
-        px = 90 + 20 * np.random.rand(n_periods + 1, n_assets)
+        px = 90 + 20 * np.random.rand(n_periods, n_assets)
         prices = pd.DataFrame(px, index=inds, columns=cols)
         return prices
 
@@ -117,6 +121,22 @@ class Utils:
         # reconstruct DataFrame
         return pd.DataFrame(wm, index=dfs[0].index, columns=dfs[0].columns)
 
+    @staticmethod
+
+    def is_frequency_date(date, freq: str, start_date = None, end_date = None) -> bool:
+        """
+        Check if date matches pandas frequency pattern
+        freq: 'W', 'BME', 'W-FRI', 'BM', etc.
+        """
+        if start_date is None:
+            start_date = date - pd.DateOffset(years = 1)  # 1 year lookback
+        if end_date is None:
+            end_date = date + pd.DateOffset(years = 1)    # 1 year lookahead
+        
+        # Generate frequency series containing the target date
+        freq_series = pd.date_range(start = start_date, end = end_date, freq = freq)
+        
+        return date in freq_series
 
 #------------------------------------------------------------------------------#
 
@@ -342,7 +362,7 @@ class AssetsHandler:
         assert group_weights_tilts.shape[0] == 1, "Input 'target_group_weights' must have 1 row."
         assert all(weights.columns == groups.columns), \
             "Columns of inputs 'weights' and 'groups' must match exactly."
-        assert (group_weights_tilts.sum(axis=1) == 0.0).all(), "Input 'target_group_weights' must have 1 row."
+        assert (group_weights_tilts.sum(axis=1).abs() < 1e-8).all(), "Input 'group_weights_tilts' must sum to zero."
 
         # Normalize weights
         weights = weights.div(weights.sum(axis=1), axis=0)

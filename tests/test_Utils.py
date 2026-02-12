@@ -8,9 +8,9 @@ Execute tests in consol with:
 """
 
 import unittest
-from Backtesting import BT
 import numpy as np
 import pandas as pd
+from Backtesting import BT
 
 class TestMetrics(unittest.TestCase):
     """Obvious"""
@@ -67,6 +67,33 @@ class TestMetrics(unittest.TestCase):
         expected = (dfs[0] + 2 * dfs[1] + 3 * dfs[2] + 4 *dfs[3]) / sum(wgts)
         actual = BT.Utils.weighted_mean_dfs(dfs = dfs, weights = wgts)
         pd.testing.assert_frame_equal(actual, expected)
+
+    def test_is_frequency_date(self):
+        """Obvious"""
+
+        # Friday
+        dt = pd.Timestamp('2026-02-27')
+        freq = "W-FRI"
+        actual = BT.Utils.is_frequency_date(date = dt, freq = freq, start_date = None, end_date = None)
+        self.assertTrue(actual)
+
+        # Saturday
+        dt = pd.Timestamp('2026-02-27')
+        freq = "W-SAT"
+        actual = BT.Utils.is_frequency_date(date = dt, freq = freq, start_date = None, end_date = None)
+        self.assertFalse(actual)
+
+        # Business month end
+        dt = pd.Timestamp('2026-02-27')
+        freq = "BME" 
+        actual = BT.Utils.is_frequency_date(date = dt, freq = freq, start_date = None, end_date = None)
+        self.assertTrue(actual)
+
+        # Calendar month end
+        dt = pd.Timestamp('2026-02-27')
+        freq = "ME" 
+        actual = BT.Utils.is_frequency_date(date = dt, freq = freq, start_date = None, end_date = None)
+        self.assertFalse(actual)
 
 
 if __name__ == "__main__":

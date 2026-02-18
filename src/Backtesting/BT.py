@@ -20,6 +20,8 @@ Prompt to get docstring
 # import os
 import numpy as np
 import pandas as pd
+import warnings
+
 # import matplotlib.pyplot as plt
 
 #------------------------------------------------------------------------------#
@@ -389,8 +391,6 @@ class AssetsHandler:
 
         # Convert back to DataFrame
         return pd.DataFrame([new_w_ser], index=weights.index, columns=weights.columns)
-
-        
 
 
 #------------------------------------------------------------------------------#
@@ -920,7 +920,6 @@ class DailyWeights:
         weights = (1 + rets).cumprod().mul(start_weights.values, axis=1)
         return weights.div(weights.sum(axis=1), axis=0)
 
-
     @staticmethod
     def compute_eod_weights(close_weights: pd.DataFrame, close_prices: pd.DataFrame) -> pd.DataFrame:
         """Compute end-of-day prices from close weights and close prices."""
@@ -934,6 +933,114 @@ class DailyWeights:
         # eod_weights = close_weights.copy()
         eod_weights.iloc[:-1, :] = wgt.iloc[:-1, :]
         return  eod_weights
+
+
+#------------------------------------------------------------------------------#
+
+class PortfolioTranches:
+    """
+    
+    """
+    def __init__(self, nb_tranches: int = 1, reset_period: str = None, reset_type: str = None):
+        """Instantiate class object"""
+
+        # Parameters
+        self.nb_tranches = None
+        self.reset_period = None
+        self.reset_type = None
+
+        # Data
+        self.asset_growth_factor = None
+        self.model_ptf = None
+
+        # Variables
+        self.model_ptf_in_tranche = None
+        self.ptf_tranches = None
+        self.ptf_global = None
+
+
+        # Handle nb_tranches parameter
+        if not isinstance(nb_tranches, int):
+            raise TypeError("Input 'nb_specs' must be an integer.")
+        
+        if not nb_tranches > 0:
+            raise ValueError("Input 'nb_specs' must be positive.")
+        
+        self.nb_tranches = nb_tranches
+        
+        # Handle reset_period parameter
+        if nb_tranches == 1:
+            if reset_period is not None:
+                warnings.warn("Discarding input 'reset_period' and setting to 'None'.", UserWarning)
+        else:
+            if reset_period not in (None, 1, nb_tranches):
+                raise ValueError("Input 'nb_tranches' must be either 'None', '1' or equal to 'nb_tranches'.")
+            self.reset_period = reset_period
+
+        # Handle reset_type parameter
+        if self.reset_period is None:
+            if reset_type is not None:
+                warnings.warn("Discarding input 'reset_type' and setting to 'None'.", UserWarning)
+        else:
+            if reset_type not in (None,"equally-weighted"):
+                raise ValueError("Input 'reset_type' must be either 'None' or 'equally-weighted'.")
+            self.reset_type = "equally-weighted"
+
+    def add_model_portfolio(self, model_ptf: pd.DataFrame):
+        """ """
+        if not isinstance(model_ptf, pd.DataFrame):
+            raise TypeError("Input 'model_ptf' must be a 'pd.DataFrame'.")
+
+        if not isinstance(model_ptf.index, pd.DatetimeIndex):
+            raise ValueError("Index of input 'model_ptf' must be a 'pd.DatetimeIndex'.")
+
+        if not len(model_ptf.index) == len(model_ptf.index.unique()):
+            raise ValueError("Index of input 'model_ptf' must be unique.")
+
+        if not len(model_ptf.columns) == len(model_ptf.columns.unique()):
+            raise ValueError("Columns of input 'model_ptf' must be unique.")
+
+        # Sort index chronologically (if needed)
+        if not model_ptf.index.is_monotonic_increasing and model_ptf.index.is_unique:
+            model_ptf.sort_index(ascending = True, inplace = True)
+
+        # Update model portfolio
+        if self.model_ptf is None:
+            self.model_ptf = model_ptf
+        else:
+            if self.model_ptf.index[-1] >= model_ptf.index[0]:
+                raise ValueError("Index of input 'model_ptf' must be posterior to existing model portfolios.")
+            self.model_ptf = pd.concat([self.model_ptf, model_ptf], axis=0).fillna(0)
+
+    def add_asset_prices(self, asset_prices: pd.DataFrame):
+        """ """
+        if not isinstance(asset_prices, pd.DataFrame):
+            raise TypeError("Input 'asset_prices' must be a 'pd.DataFrame'.")
+
+        if not isinstance(asset_prices.index, pd.DatetimeIndex):
+            raise ValueError("Index of input 'asset_prices' must be a 'pd.DatetimeIndex'.")
+
+        if not len(asset_prices.index) == len(asset_prices.index.unique()):
+            raise ValueError("Index of input 'asset_prices' must be unique.")
+
+        if not len(asset_prices.columns) == len(asset_prices.columns.unique()):
+            raise ValueError("Columns of input 'asset_prices' must be unique.")
+
+        # Sort index chronologically (if needed)
+        if not asset_prices.index.is_monotonic_increasing and asset_prices.index.is_unique:
+            asset_prices.sort_index(ascending = True, inplace = True)
+
+        # Update growth factor
+        if self.asset_growth_factor is None:
+            self.asset_growth_factor = asset_prices.div(asset_prices.iloc[0], axis = 1)
+        else:
+            if self.asset_growth_factor.index[-1] != asset_prices.index[0]:
+                raise ValueError("Input 'model_ptf' must complement existing available data.")
+            
+            curr_ret = self.asset_growth_factor.pct_change()
+            add_ret = asset_prices.pct_change().iloc[1:, :]
+            new_ret = pd.concat([curr_ret, add_ret], axis=0).fillna(0)
+            self.asset_growth_factor = (1 + new_ret).cumprod()
 
 
 #------------------------------------------------------------------------------#
@@ -979,5 +1086,4 @@ class zzz_Weights:
 
         return weights.div(wgt_net, axis=0)
     
-
 #------------------------------------------------------------------------------#

@@ -8,9 +8,9 @@ Execute tests in consol with:
 """
 
 import unittest
-from Backtesting import BT
 import numpy as np
 import pandas as pd
+from Backtesting import BT
 
 class TestMetrics(unittest.TestCase):
     """Obvious"""
@@ -153,6 +153,7 @@ class TestMetrics(unittest.TestCase):
         pd.testing.assert_frame_equal(actual["singles"][0], expected["singles"][0])
         pd.testing.assert_frame_equal(actual["singles"][1], expected["singles"][1])
         pd.testing.assert_frame_equal(actual["global"], expected["global"])
+
 
 if __name__ == "__main__":
     unittest.main()

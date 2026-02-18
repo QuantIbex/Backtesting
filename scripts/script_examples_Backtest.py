@@ -420,6 +420,7 @@ for ii, ii_dt in enumerate(trading_days):
         # COMPUTE STRATEGY WEIGHTS                                                           # 
         #------------------------------------------------------------------------------------#
 
+        # TODO: implement portfolio tranches
         for jj_specs in specs["strategy_specs"]["strategies"].values():
             # jj = 0
             # jj_specs = list(specs["strategy_specs"]["strategies"].values())[jj]

@@ -887,28 +887,30 @@ class Groups:
 
 #------------------------------------------------------------------------------#
 
-class DailyWeights:
+class PortfolioWeights:
     """
-    Class to handle daily open, close, and end-of-day weights.
+    Class to handle open, close, and end-of-day weights.
     Close weights are weights at market close based existing holding and close prices.
-    End-of day weights are weights based on holdings after allocation changes performed at the close.
+    End-of-day weights are weights based on holdings after allocation changes performed at the close.
     Open weights are weights based on existing holdings at market open and open prices.
     """
     def __init__(self):
         """Instantiate class object"""
-        self.open_weights = None
+        self.model_ptf = None
+        self.close_prices = None
         self.close_weights = None
         self.eod_weights = None
-        self.open_prices = None
-        self.close_prices = None
 
+
+    # TODO: Move this method to Weights class
     @staticmethod
     def equal_weights(prices: pd.DataFrame) -> pd.DataFrame:
         """Compute equal weights for assets having prices"""
         weights = pd.DataFrame(1.0, index = prices.index, columns=prices.columns)
         weights.mask(prices.isna(), 0.0, inplace=True)
         return weights.div(prices.count(axis=1), axis=0)
-        
+    
+    # TODO: Move this method to Weights class
     @staticmethod
     def drifting_weights(start_weights: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
         """Compute drifting weights"""
@@ -954,7 +956,7 @@ class PortfolioTranches:
         self.model_ptf = None
 
         # Variables
-        self.model_ptf_in_tranche = None
+        self.model_ptf_assigned_tranche = None
         self.ptf_tranches = None
         self.ptf_global = None
 
@@ -1041,6 +1043,119 @@ class PortfolioTranches:
             add_ret = asset_prices.pct_change().iloc[1:, :]
             new_ret = pd.concat([curr_ret, add_ret], axis=0).fillna(0)
             self.asset_growth_factor = (1 + new_ret).cumprod()
+
+    def update_tranches(self):
+        """ """
+        
+        self._update_model_ptf_assigned_tranche()
+
+
+
+
+
+        self.ptf_tranches = None
+
+
+    def _update_model_ptf_assigned_tranche(self):
+        """Obvious"""
+
+        # Get new model portfolio tranche assignation 
+        n = self.nb_tranches
+        N = len(self.model_ptf)
+        new_mpat = pd.Series([i % n for i in range(N)], index = self.model_ptf.index)
+        
+        # Sanity check
+        if self.model_ptf_assigned_tranche is not None:
+            current_mpat = self.model_ptf_assigned_tranche
+            # print(current_mpat)
+            # print(len(current_mpat))
+            # print(new_mpat)
+
+            if pd.testing.assert_series_equal(new_mpat.iloc[:len(current_mpat)], current_mpat):
+                raise ValueError("Attempting to replace model portfolio tranche assignment with different values.")
+
+        self.model_ptf_assigned_tranche = new_mpat
+
+
+#------------------------------------------------------------------------------#
+
+class DailyPrices:
+    """
+    Class to store and handle daily prices (e.g., close or open prices)
+    """
+    def __init__(self):
+        """Instantiate class object"""
+        self.prices = None
+
+    def add_prices(self, prices: pd.DataFrame):
+        """ """
+        if not isinstance(prices, pd.DataFrame):
+            raise TypeError("Input 'prices' must be a 'pd.DataFrame'.")
+
+        if not isinstance(prices.index, pd.DatetimeIndex):
+            raise ValueError("Index of input 'prices' must be a 'pd.DatetimeIndex'.")
+
+        if not len(prices.index) == len(prices.index.unique()):
+            raise ValueError("Index of input 'prices' must be unique.")
+
+        if not len(prices.columns) == len(prices.columns.unique()):
+            raise ValueError("Columns of input 'prices' must be unique.")
+
+        # Sort index chronologically (if needed)
+        if not prices.index.is_monotonic_increasing and prices.index.is_unique:
+            prices.sort_index(ascending = True, inplace = True)
+
+        # Update prices
+        if self.prices is None:
+            self.prices = prices
+        else:
+            # Check on dates
+            if self.prices.index[-1] != prices.index[0]:
+                raise ValueError("First date of input 'prices' must match with last date of existing prices.")
+            # Check on values
+            common_cols = self.prices.columns.intersection(prices.columns)
+            cur_px_last = self.prices[common_cols].iloc[[-1]]
+            new_px_first = prices[common_cols].iloc[[0]]
+            if (cur_px_last.values != new_px_first.values).any():
+                raise ValueError("Start values of input 'prices' must match with last values of existing prices.")
+
+            self.prices = self.prices.combine_first(prices)
+
+#------------------------------------------------------------------------------#
+
+class ModelPortfolio:
+    """
+    Class to store and handle model portfolio
+    """
+    def __init__(self):
+        """Instantiate class object"""
+        self.model_ptf = None
+
+    def add_model_portfolio(self, model_ptf: pd.DataFrame):
+        """Obvious"""
+        if not isinstance(model_ptf, pd.DataFrame):
+            raise TypeError("Input 'model_ptf' must be a 'pd.DataFrame'.")
+
+        if not isinstance(model_ptf.index, pd.DatetimeIndex):
+            raise ValueError("Index of input 'model_ptf' must be a 'pd.DatetimeIndex'.")
+
+        if not len(model_ptf.index) == len(model_ptf.index.unique()):
+            raise ValueError("Index of input 'model_ptf' must be unique.")
+
+        if not len(model_ptf.columns) == len(model_ptf.columns.unique()):
+            raise ValueError("Columns of input 'model_ptf' must be unique.")
+
+        # Sort index chronologically (if needed)
+        if not model_ptf.index.is_monotonic_increasing and model_ptf.index.is_unique:
+            model_ptf.sort_index(ascending = True, inplace = True)
+
+        # Update model portfolio
+        if self.model_ptf is None:
+            self.model_ptf = model_ptf
+        else:
+            if self.model_ptf.index[-1] >= model_ptf.index[0]:
+                raise ValueError("Index of input 'model_ptf' must be posterior to existing model portfolios.")
+            self.model_ptf = pd.concat([self.model_ptf, model_ptf], axis=0).fillna(0)
 
 
 #------------------------------------------------------------------------------#

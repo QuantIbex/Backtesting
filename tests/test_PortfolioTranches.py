@@ -214,6 +214,98 @@ class TestPortfolioTranches(unittest.TestCase):
         actual = pt.asset_growth_factor
         pd.testing.assert_frame_equal(actual, expected)
 
+    def test__update_model_ptf_assigned_tranche(self):
+        """Obvious"""
+
+        inds = pd.to_datetime(["2025-12-31", "2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"])
+        model_ptf = pd.DataFrame(
+            {"A": [0.1, 0.2, 0.3, 0.4, 0.1],
+             "B": [0.2, 0.3, 0.4, 0.1, 0.2],
+             "C": [0.3, 0.4, 0.1, 0.2, 0.3],
+             "D": [0.4, 0.1, 0.2, 0.3, 0.4]}, index = inds)
+
+        # Single updates - Only 1 tranche
+        nb_tranches = 1
+        expected = pd.Series(0, index = inds)
+        pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
+        pt.add_model_portfolio(model_ptf = model_ptf)
+        pt._update_model_ptf_assigned_tranche()
+        actual = pt.model_ptf_assigned_tranche
+        pd.testing.assert_series_equal(actual, expected)
+
+        # Single updates - Few tranches
+        nb_tranches = 3
+        expected = pd.Series([0, 1, 2, 0, 1], index = inds)
+        pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
+        pt.add_model_portfolio(model_ptf = model_ptf)
+        pt._update_model_ptf_assigned_tranche()
+        actual = pt.model_ptf_assigned_tranche
+        pd.testing.assert_series_equal(actual, expected)
+
+        # Single updates - Many tranches
+        nb_tranches = 7
+        expected = pd.Series([0, 1, 2, 3, 4], index = inds)
+        pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
+        pt.add_model_portfolio(model_ptf = model_ptf)
+        pt._update_model_ptf_assigned_tranche()
+        actual = pt.model_ptf_assigned_tranche
+        pd.testing.assert_series_equal(actual, expected)
+
+        # Multiple updates - Only 1 tranche
+        nb_tranches = 1
+        expected = pd.Series(0, index = inds)
+        pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
+        pt.add_model_portfolio(model_ptf = model_ptf.iloc[:3, :])
+        pt._update_model_ptf_assigned_tranche()
+        pt.add_model_portfolio(model_ptf = model_ptf.iloc[3:, :])
+        pt._update_model_ptf_assigned_tranche()
+        actual = pt.model_ptf_assigned_tranche
+        pd.testing.assert_series_equal(actual, expected)
+
+        # Multiple updates - Few tranches
+        nb_tranches = 3
+        expected = pd.Series([0, 1, 2, 0, 1], index = inds)
+        pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
+        pt.add_model_portfolio(model_ptf = model_ptf.iloc[:3, :])
+        pt._update_model_ptf_assigned_tranche()
+        pt.add_model_portfolio(model_ptf = model_ptf.iloc[3:, :])
+        pt._update_model_ptf_assigned_tranche()
+        actual = pt.model_ptf_assigned_tranche
+        pd.testing.assert_series_equal(actual, expected)
+
+        # Multiple updates - Many tranches
+        nb_tranches = 7
+        expected = pd.Series([0, 1, 2, 3, 4], index = inds)
+        pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
+        pt.add_model_portfolio(model_ptf = model_ptf.iloc[:3, :])
+        pt._update_model_ptf_assigned_tranche()
+        pt.add_model_portfolio(model_ptf = model_ptf.iloc[3:, :])
+        pt._update_model_ptf_assigned_tranche()
+        actual = pt.model_ptf_assigned_tranche
+        pd.testing.assert_series_equal(actual, expected)
+
+
+
+    def test_update_tranches(self):
+        """Obvious"""
+
+        inds = pd.to_datetime(["2025-11-30", "2025-12-31", "2026-01-31", 
+                               "2026-02-28", "2026-03-31", "2026-04-30"])
+        asset_prices = pd.DataFrame(
+            {"A": [100, 101, 102, 103, 104, 105],
+             "B": [200, 204, 202, 208, 206, 210],
+             "C": [300, 303, 309, 318, 330, 345],
+             "D": [400, 404, 400, 404, 400, 404]}, index = inds)
+
+        model_ptf = pd.DataFrame(
+            {"A": [0.1, 0.2, 0.3],
+             "B": [0.2, 0.3, 0.4],
+             "C": [0.3, 0.4, 0.1],
+             "D": [0.4, 0.1, 0.2]}, index = inds[[1, 3, 5]])
+
+        model_ptf.index.values
+
+
 
 if __name__ == "__main__":
     unittest.main()

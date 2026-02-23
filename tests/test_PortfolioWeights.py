@@ -1,6 +1,6 @@
 #%%
 """
-Test suite for class BT.DailyWeights
+Test suite for class BT.PortfolioWeights
 
 Execute tests in consol with:
     pdm run python -m unittest discover -s tests
@@ -40,6 +40,7 @@ class TestDailyWeights(unittest.TestCase):
         return {"close_prices": close_prices, "close_alloc": close_alloc, "eod_alloc": eod_alloc,
                 "close_weights": close_weights, "eod_weights":eod_weights}
 
+
     def test_equal_weights(self):
         """Obvious"""
         dt = pd.to_datetime(["2025-04-01", "2025-04-02", "2025-04-03", "2025-04-04", "2025-04-05"])
@@ -53,7 +54,7 @@ class TestDailyWeights(unittest.TestCase):
                 
         wgt = [[0.0, 0.0, 1.0], [0.5, 0.0, 0.5], [1/3, 1/3, 1/3], [1/3, 1/3, 1/3], [0.5, 0.5, 0.0]]
         expected = pd.DataFrame(wgt, index = dt, columns=cols)
-        actual = BT.DailyWeights.equal_weights(prices = prices)
+        actual = BT.PortfolioWeights.equal_weights(prices = prices)
         pd.testing.assert_frame_equal(actual, expected)
         
     def test_drifting_weights(self):
@@ -65,7 +66,7 @@ class TestDailyWeights(unittest.TestCase):
 
         allocation = notional * prices.div(prices.values[0, :], axis=1).mul(start_weights.values, axis=1)
         expected = allocation.div(allocation.sum(axis=1), axis=0)
-        actual = BT.DailyWeights.drifting_weights(start_weights = start_weights, prices = prices)
+        actual = BT.PortfolioWeights.drifting_weights(start_weights = start_weights, prices = prices)
         pd.testing.assert_frame_equal(actual, expected)
 
     def test_compute_eod_weights(self):
@@ -78,7 +79,7 @@ class TestDailyWeights(unittest.TestCase):
 
         expected = eod_weights
         expected.iloc[-1, :] = np.nan
-        actual = BT.DailyWeights.compute_eod_weights(close_weights = close_weights, close_prices=close_prices)
+        actual = BT.PortfolioWeights.compute_eod_weights(close_weights = close_weights, close_prices=close_prices)
         pd.testing.assert_frame_equal(actual, expected)
         
 if __name__ == "__main__":

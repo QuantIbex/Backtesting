@@ -392,7 +392,6 @@ class AssetsHandler:
         # Convert back to DataFrame
         return pd.DataFrame([new_w_ser], index=weights.index, columns=weights.columns)
 
-
 #------------------------------------------------------------------------------#
 
 class Metrics:
@@ -825,7 +824,6 @@ class Weightings:
 
         return longs + shorts
 
-
 #------------------------------------------------------------------------------#
 
 class Groups:
@@ -882,200 +880,6 @@ class Groups:
         TBD.
         """
         raise NotImplementedError("Method 'clustering' not implemented yet!")
-        
-        
-
-#------------------------------------------------------------------------------#
-
-class PortfolioWeights:
-    """
-    Class to handle open, close, and end-of-day weights.
-    Close weights are weights at market close based existing holding and close prices.
-    End-of-day weights are weights based on holdings after allocation changes performed at the close.
-    Open weights are weights based on existing holdings at market open and open prices.
-    """
-    def __init__(self):
-        """Instantiate class object"""
-        self.model_ptf = None
-        self.close_prices = None
-        self.close_weights = None
-        self.eod_weights = None
-
-
-    # TODO: Move this method to Weights class
-    @staticmethod
-    def equal_weights(prices: pd.DataFrame) -> pd.DataFrame:
-        """Compute equal weights for assets having prices"""
-        weights = pd.DataFrame(1.0, index = prices.index, columns=prices.columns)
-        weights.mask(prices.isna(), 0.0, inplace=True)
-        return weights.div(prices.count(axis=1), axis=0)
-    
-    # TODO: Move this method to Weights class
-    @staticmethod
-    def drifting_weights(start_weights: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
-        """Compute drifting weights"""
-
-        assert start_weights.shape[0] == 1
-        assert start_weights.index[0] == prices.index[0]
-
-        rets = prices.pct_change().fillna(0)
-        weights = (1 + rets).cumprod().mul(start_weights.values, axis=1)
-        return weights.div(weights.sum(axis=1), axis=0)
-
-    @staticmethod
-    def compute_eod_weights(close_weights: pd.DataFrame, close_prices: pd.DataFrame) -> pd.DataFrame:
-        """Compute end-of-day prices from close weights and close prices."""
-
-        wgt = close_weights.shift(-1) / (close_prices.shift(-1) / close_prices)
-        wgt = wgt.fillna(0)
-        wgt = wgt.div(wgt.sum(axis=1), axis=0)
-
-        eod_weights = pd.DataFrame(index = wgt.index, columns = wgt.columns, dtype=float)
-
-        # eod_weights = close_weights.copy()
-        eod_weights.iloc[:-1, :] = wgt.iloc[:-1, :]
-        return  eod_weights
-
-
-#------------------------------------------------------------------------------#
-
-class PortfolioTranches:
-    """
-    
-    """
-    def __init__(self, nb_tranches: int = 1, reset_period: str = None, reset_type: str = None):
-        """Instantiate class object"""
-
-        # Parameters
-        self.nb_tranches = None
-        self.reset_period = None
-        self.reset_type = None
-
-        # Data
-        self.asset_growth_factor = None
-        self.model_ptf = None
-
-        # Variables
-        self.model_ptf_assigned_tranche = None
-        self.ptf_tranches = None
-        self.ptf_global = None
-
-
-        # Handle nb_tranches parameter
-        if not isinstance(nb_tranches, int):
-            raise TypeError("Input 'nb_specs' must be an integer.")
-        
-        if not nb_tranches > 0:
-            raise ValueError("Input 'nb_specs' must be positive.")
-        
-        self.nb_tranches = nb_tranches
-        
-        # Handle reset_period parameter
-        if nb_tranches == 1:
-            if reset_period is not None:
-                warnings.warn("Discarding input 'reset_period' and setting to 'None'.", UserWarning)
-        else:
-            if reset_period not in (None, 1, nb_tranches):
-                raise ValueError("Input 'nb_tranches' must be either 'None', '1' or equal to 'nb_tranches'.")
-            self.reset_period = reset_period
-
-        # Handle reset_type parameter
-        if self.reset_period is None:
-            if reset_type is not None:
-                warnings.warn("Discarding input 'reset_type' and setting to 'None'.", UserWarning)
-        else:
-            if reset_type not in (None,"equally-weighted"):
-                raise ValueError("Input 'reset_type' must be either 'None' or 'equally-weighted'.")
-            self.reset_type = "equally-weighted"
-
-    def add_model_portfolio(self, model_ptf: pd.DataFrame):
-        """ """
-        if not isinstance(model_ptf, pd.DataFrame):
-            raise TypeError("Input 'model_ptf' must be a 'pd.DataFrame'.")
-
-        if not isinstance(model_ptf.index, pd.DatetimeIndex):
-            raise ValueError("Index of input 'model_ptf' must be a 'pd.DatetimeIndex'.")
-
-        if not len(model_ptf.index) == len(model_ptf.index.unique()):
-            raise ValueError("Index of input 'model_ptf' must be unique.")
-
-        if not len(model_ptf.columns) == len(model_ptf.columns.unique()):
-            raise ValueError("Columns of input 'model_ptf' must be unique.")
-
-        # Sort index chronologically (if needed)
-        if not model_ptf.index.is_monotonic_increasing and model_ptf.index.is_unique:
-            model_ptf.sort_index(ascending = True, inplace = True)
-
-        # Update model portfolio
-        if self.model_ptf is None:
-            self.model_ptf = model_ptf
-        else:
-            if self.model_ptf.index[-1] >= model_ptf.index[0]:
-                raise ValueError("Index of input 'model_ptf' must be posterior to existing model portfolios.")
-            self.model_ptf = pd.concat([self.model_ptf, model_ptf], axis=0).fillna(0)
-
-    def add_asset_prices(self, asset_prices: pd.DataFrame):
-        """ """
-        if not isinstance(asset_prices, pd.DataFrame):
-            raise TypeError("Input 'asset_prices' must be a 'pd.DataFrame'.")
-
-        if not isinstance(asset_prices.index, pd.DatetimeIndex):
-            raise ValueError("Index of input 'asset_prices' must be a 'pd.DatetimeIndex'.")
-
-        if not len(asset_prices.index) == len(asset_prices.index.unique()):
-            raise ValueError("Index of input 'asset_prices' must be unique.")
-
-        if not len(asset_prices.columns) == len(asset_prices.columns.unique()):
-            raise ValueError("Columns of input 'asset_prices' must be unique.")
-
-        # Sort index chronologically (if needed)
-        if not asset_prices.index.is_monotonic_increasing and asset_prices.index.is_unique:
-            asset_prices.sort_index(ascending = True, inplace = True)
-
-        # Update growth factor
-        if self.asset_growth_factor is None:
-            self.asset_growth_factor = asset_prices.div(asset_prices.iloc[0], axis = 1)
-        else:
-            if self.asset_growth_factor.index[-1] != asset_prices.index[0]:
-                raise ValueError("Input 'model_ptf' must complement existing available data.")
-            
-            curr_ret = self.asset_growth_factor.pct_change()
-            add_ret = asset_prices.pct_change().iloc[1:, :]
-            new_ret = pd.concat([curr_ret, add_ret], axis=0).fillna(0)
-            self.asset_growth_factor = (1 + new_ret).cumprod()
-
-    def update_tranches(self):
-        """ """
-        
-        self._update_model_ptf_assigned_tranche()
-
-
-
-
-
-        self.ptf_tranches = None
-
-
-    def _update_model_ptf_assigned_tranche(self):
-        """Obvious"""
-
-        # Get new model portfolio tranche assignation 
-        n = self.nb_tranches
-        N = len(self.model_ptf)
-        new_mpat = pd.Series([i % n for i in range(N)], index = self.model_ptf.index)
-        
-        # Sanity check
-        if self.model_ptf_assigned_tranche is not None:
-            current_mpat = self.model_ptf_assigned_tranche
-            # print(current_mpat)
-            # print(len(current_mpat))
-            # print(new_mpat)
-
-            if pd.testing.assert_series_equal(new_mpat.iloc[:len(current_mpat)], current_mpat):
-                raise ValueError("Attempting to replace model portfolio tranche assignment with different values.")
-
-        self.model_ptf_assigned_tranche = new_mpat
-
 
 #------------------------------------------------------------------------------#
 
@@ -1153,9 +957,348 @@ class ModelPortfolio:
         if self.model_ptf is None:
             self.model_ptf = model_ptf
         else:
+            if self.model_ptf.index[-1] > model_ptf.index[0]:
+                raise ValueError("Index of input 'model_ptf' must be posterior to existing model portfolios.")
+            self.model_ptf = pd.concat([self.model_ptf, model_ptf], axis=0).fillna(0)
+
+#------------------------------------------------------------------------------#
+
+class PortfolioWeights:
+    """
+    Class to handle close and end-of-day weights.
+    Close weights are weights at market close based existing holding and close prices.
+    End-of-day weights are weights based on holdings after allocation changes performed at the close.
+    """
+    def __init__(self):
+        """Instantiate class object"""
+        self.model_ptf = None
+        self.close_weights = None
+        self.eod_weights = None
+
+    def add_rebalancing(self, model_ptf: pd.DataFrame):
+        """Obvious"""
+        if self.model_ptf is None:
+            self.model_ptf = ModelPortfolio()
+
+        self.model_ptf.add_model_portfolio(model_ptf = model_ptf)
+
+    def get_rebalancings(self):
+        """Obvious"""
+
+        if self.model_ptf is None:
+            return None
+        else:
+            return self.model_ptf.model_ptf
+
+    @staticmethod
+    def _internal_compute_ptf_weights(model_ptf: pd.DataFrame, close_prices: pd.DataFrame) -> dict:
+        """Obvious"""
+
+        #### SANITY CHECKS & DATA HANDLING ####
+
+        # Check that close prices index are unique
+        if not len(close_prices.index) == len(close_prices.index.unique()):
+            raise ValueError("Index of input 'close_prices' must be unique.")
+        
+        # Check that close prices columns are unique
+        if not len(close_prices.columns) == len(close_prices.columns.unique()):
+            raise ValueError("Columns of input 'close_prices' must be unique.")
+
+        # Check that the index of prices covers the index of model portfolios
+        if not model_ptf.index.isin(close_prices.index).all():
+            raise ValueError(
+                "Index of input 'close_prices' must contain all elements "
+                "of index of 'model_ptf'.")
+
+        # Check that the columns of prices covers the index of model portfolios
+        if not model_ptf.columns.isin(close_prices.columns).all():
+            raise ValueError(
+                "Columns of input 'close_prices' must contain all elements "
+                "of columns of 'model_ptf'.")
+
+        # Sort close prices index chrnologically (if needed)
+        if not close_prices.index.is_monotonic_increasing:
+            close_prices.sort_index(ascending = True, inplace = True)
+
+        # Select columns of close prices to match columns OF model portfolio 
+        close_prices = close_prices.loc[:, model_ptf.columns]
+
+        #### MAIN ####
+
+        # Get period dates
+        period_dates = model_ptf.index.values
+        if model_ptf.index[-1] < close_prices.index[-1]:
+            period_dates = np.append(period_dates, close_prices.index[[-1]].values)
+
+        # Iterate on periods
+        n_rebal = len(period_dates) - 1
+        close_wgt_lst = [None] * n_rebal
+        eod_wgt_lst = [None] * n_rebal
+        for ii in range(n_rebal):
+            ii_start_dt = period_dates[ii]
+            ii_end_dt = period_dates[ii + 1]
+            ii_start_wgt = model_ptf.loc[[ii_start_dt], :]
+            ii_prices = close_prices.loc[ii_start_dt:ii_end_dt, :]
+            ii_drift_wgt = PortfolioWeights.drifting_weights(
+                start_weights = ii_start_wgt, prices = ii_prices)
+            close_wgt_lst[ii] = ii_drift_wgt[1:]
+            eod_wgt_lst[ii] = ii_drift_wgt[:-1]
+
+        # Concatenate close weights
+        close_weights = pd.concat(close_wgt_lst, axis=0)
+        close_weights.loc[period_dates[0]] = np.full(close_weights.shape[1], np.nan)
+        close_weights.sort_index(ascending = True, inplace = True)
+
+        # Concatenate end-of-day weights
+        eod_weights = pd.concat(eod_wgt_lst, axis=0)
+        if model_ptf.index[-1] < close_prices.index[-1]:
+            eod_weights.loc[period_dates[-1]] = np.full(close_weights.shape[1], np.nan)
+        else:
+            eod_weights.loc[period_dates[-1]] = model_ptf.loc[period_dates[-1]].values
+
+        return {"close_weights": close_weights,
+                "eod_weights": eod_weights}
+
+    # TODO: add missing sanity checks and tests (see comments)
+    def compute_ptf_weights(self, close_prices: pd.DataFrame):
+        """Obvious"""
+
+        #### INITIALIZATION ####
+
+        rebals = self.get_rebalancings()
+        # Warn and exit if no model portfolio
+        if rebals is None:
+            print("Add warning that no model portfolio")
+            return
+
+        # Get model portfolios to use
+        if self.close_weights is None:
+            model_ptf = rebals
+        else:
+            # Warn and exit if no new model portfolio to update weights
+            if rebals.index[-1] < self.close_weights.index[-1]:
+                print("Add warning: no new model portfolio")
+                return
+
+            # Use only rebalancings unused in previously computed close/eod weights
+            mask = rebals.index >= self.close_weights.index[-1]
+            model_ptf = rebals[mask]
+
+            # Add starting weights if rebalancings not on day of previously computed close/eod weights
+            if model_ptf.index[0] > self.close_weights.index[-1]:
+                model_ptf = pd.concat([self.close_weights.iloc[[-1]], model_ptf], axis = 0)
+
+        # TODO: check that prices available if weights > 0
+        # TODO: Check that rebalancings start on of after last available close/eod date
+        # TODO: Check that prices start on end date of existing weights
+
+        #### COMPUTE PORTFOLIO WEIGHTS ####
+
+        res = self._internal_compute_ptf_weights(model_ptf = model_ptf, close_prices = close_prices)
+
+        #### UPDATE CLASS PROPERTIES ####
+
+        if self.close_weights is None:
+            self.close_weights = res["close_weights"]
+            self.eod_weights = res["eod_weights"]
+        else:
+            new_close_wgts = pd.concat([self.close_weights, res["close_weights"].iloc[1:]], axis = 0)
+            new_eod_wgts = pd.concat([self.eod_weights.iloc[:-1], res["eod_weights"]], axis = 0)
+            self.close_weights = new_close_wgts
+            self.eod_weights = new_eod_wgts
+
+
+    # TODO: Move this method to Weights class
+    @staticmethod
+    def equal_weights(prices: pd.DataFrame) -> pd.DataFrame:
+        """Compute equal weights for assets having prices"""
+        weights = pd.DataFrame(1.0, index = prices.index, columns=prices.columns)
+        weights.mask(prices.isna(), 0.0, inplace=True)
+        return weights.div(prices.count(axis=1), axis=0)
+    
+    # TODO: Move this method to Weights class
+    # TODO: assert that prices columns contain all start weights columns (and possible more)
+    # TODO: add step to match column orders of both in puts
+    @staticmethod
+    def drifting_weights(start_weights: pd.DataFrame, prices: pd.DataFrame) -> pd.DataFrame:
+        """Compute drifting weights"""
+
+        assert start_weights.shape[0] == 1
+        assert start_weights.index[0] == prices.index[0]
+
+        rets = prices.pct_change().fillna(0)
+        weights = (1 + rets).cumprod().mul(start_weights.values, axis=1)
+        return weights.div(weights.sum(axis=1), axis=0)
+
+
+#------------------------------------------------------------------------------#
+
+class PortfolioTranches:
+    """
+    
+    """
+    def __init__(self, nb_tranches: int = 1, reset_period: str = None, reset_type: str = None):
+        """Instantiate class object"""
+
+        # Parameters
+        self.nb_tranches = None
+        self.reset_period = None
+        self.reset_type = None
+
+        # Data
+        self.asset_growth_factor = None
+        self.model_ptf = None
+
+        # Variables
+        self.model_ptf_assigned_tranche = None
+        self.ptf_tranches = None
+        self.ptf_global = None
+
+
+        # Handle nb_tranches parameter
+        if not isinstance(nb_tranches, int):
+            raise TypeError("Input 'nb_specs' must be an integer.")
+        
+        if not nb_tranches > 0:
+            raise ValueError("Input 'nb_specs' must be positive.")
+        
+        self.nb_tranches = nb_tranches
+        
+        # Handle reset_period parameter
+        if nb_tranches == 1:
+            if reset_period is not None:
+                warnings.warn("Discarding input 'reset_period' and setting to 'None'.", UserWarning)
+        else:
+            if reset_period not in (None, 1, nb_tranches):
+                raise ValueError("Input 'nb_tranches' must be either 'None', '1' or equal to 'nb_tranches'.")
+            self.reset_period = reset_period
+
+        # Handle reset_type parameter
+        if self.reset_period is None:
+            if reset_type is not None:
+                warnings.warn("Discarding input 'reset_type' and setting to 'None'.", UserWarning)
+        else:
+            if reset_type not in (None,"equally-weighted"):
+                raise ValueError("Input 'reset_type' must be either 'None' or 'equally-weighted'.")
+            self.reset_type = "equally-weighted"
+
+    # TODO: remove this and use dedicated class
+    def add_model_portfolio(self, model_ptf: pd.DataFrame):
+        """ """
+        if not isinstance(model_ptf, pd.DataFrame):
+            raise TypeError("Input 'model_ptf' must be a 'pd.DataFrame'.")
+
+        if not isinstance(model_ptf.index, pd.DatetimeIndex):
+            raise ValueError("Index of input 'model_ptf' must be a 'pd.DatetimeIndex'.")
+
+        if not len(model_ptf.index) == len(model_ptf.index.unique()):
+            raise ValueError("Index of input 'model_ptf' must be unique.")
+
+        if not len(model_ptf.columns) == len(model_ptf.columns.unique()):
+            raise ValueError("Columns of input 'model_ptf' must be unique.")
+
+        # Sort index chronologically (if needed)
+        if not model_ptf.index.is_monotonic_increasing and model_ptf.index.is_unique:
+            model_ptf.sort_index(ascending = True, inplace = True)
+
+        # Update model portfolio
+        if self.model_ptf is None:
+            self.model_ptf = model_ptf
+        else:
             if self.model_ptf.index[-1] >= model_ptf.index[0]:
                 raise ValueError("Index of input 'model_ptf' must be posterior to existing model portfolios.")
             self.model_ptf = pd.concat([self.model_ptf, model_ptf], axis=0).fillna(0)
+
+    # TODO: remove this and use dedicated class
+    def add_asset_prices(self, asset_prices: pd.DataFrame):
+        """ """
+        if not isinstance(asset_prices, pd.DataFrame):
+            raise TypeError("Input 'asset_prices' must be a 'pd.DataFrame'.")
+
+        if not isinstance(asset_prices.index, pd.DatetimeIndex):
+            raise ValueError("Index of input 'asset_prices' must be a 'pd.DatetimeIndex'.")
+
+        if not len(asset_prices.index) == len(asset_prices.index.unique()):
+            raise ValueError("Index of input 'asset_prices' must be unique.")
+
+        if not len(asset_prices.columns) == len(asset_prices.columns.unique()):
+            raise ValueError("Columns of input 'asset_prices' must be unique.")
+
+        # Sort index chronologically (if needed)
+        if not asset_prices.index.is_monotonic_increasing and asset_prices.index.is_unique:
+            asset_prices.sort_index(ascending = True, inplace = True)
+
+        # Update growth factor
+        if self.asset_growth_factor is None:
+            self.asset_growth_factor = asset_prices.div(asset_prices.iloc[0], axis = 1)
+        else:
+            if self.asset_growth_factor.index[-1] != asset_prices.index[0]:
+                raise ValueError("Input 'model_ptf' must complement existing available data.")
+            
+            curr_ret = self.asset_growth_factor.pct_change()
+            add_ret = asset_prices.pct_change().iloc[1:, :]
+            new_ret = pd.concat([curr_ret, add_ret], axis=0).fillna(0)
+            self.asset_growth_factor = (1 + new_ret).cumprod()
+
+    def update_tranches(self):
+        """ """
+        
+        self._update_model_ptf_assigned_tranche()
+
+
+        # Initializing tranches
+        if self.ptf_tranches is None:
+            self.ptf_tranches = [None] * self.nb_tranches
+            for ii in range(self.nb_tranches):
+                print(f"Initializing tranch {ii}")
+                self.ptf_tranches[ii] = PortfolioWeights()
+
+            new_rebals = self.model_ptf
+            new_prices = self.asset_growth_factor
+            new_pft_assigned_tranches = self.model_ptf_assigned_tranche
+        else:
+            
+            last_avail_date = self.ptf_tranches[0].model_ptf.index[-1]
+            mask = self.model_ptf.index.values > last_avail_date 
+            new_rebals = self.model_ptf[mask]
+            new_prices = None # TODO: code this
+            new_pft_assigned_tranches = None # TODO: code this
+
+        # Update tranches
+        for ii in range(self.nb_tranches):
+            print(f"Handling tranche {ii}")
+            
+            mask = new_pft_assigned_tranches == ii
+            ii_new_rebals = new_rebals[mask]
+            print(ii_new_rebals)
+            self.ptf_tranches[ii].add_rebalancing(model_ptf = ii_new_rebals)
+            self.ptf_tranches[ii].compute_ptf_weights(close_prices = new_prices)
+
+
+
+
+
+    def _update_model_ptf_assigned_tranche(self):
+        """Obvious"""
+
+        # Get new model portfolio tranche assignation 
+        n = self.nb_tranches
+        N = len(self.model_ptf)
+        new_mpat = pd.Series([i % n for i in range(N)], index = self.model_ptf.index)
+        
+        # Sanity check
+        if self.model_ptf_assigned_tranche is not None:
+            current_mpat = self.model_ptf_assigned_tranche
+            # print(current_mpat)
+            # print(len(current_mpat))
+            # print(new_mpat)
+
+            if pd.testing.assert_series_equal(new_mpat.iloc[:len(current_mpat)], current_mpat):
+                raise ValueError("Attempting to replace model portfolio tranche assignment with different values.")
+
+        self.model_ptf_assigned_tranche = new_mpat
+
+
 
 
 #------------------------------------------------------------------------------#

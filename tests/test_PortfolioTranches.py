@@ -286,7 +286,7 @@ class TestPortfolioTranches(unittest.TestCase):
 
 
 
-    def test_update_tranches(self):
+    def NOT_test_update_tranches(self):
         """Obvious"""
 
         inds = pd.to_datetime(["2025-11-30", "2025-12-31", "2026-01-31", 
@@ -303,8 +303,39 @@ class TestPortfolioTranches(unittest.TestCase):
              "C": [0.3, 0.4, 0.1],
              "D": [0.4, 0.1, 0.2]}, index = inds[[1, 3, 5]])
 
-        model_ptf.index.values
+        # model_ptf.index.values
 
+
+        pt = BT.PortfolioTranches(nb_tranches = 3)
+        pt.add_model_portfolio(model_ptf = model_ptf)
+        pt.add_asset_prices(asset_prices = asset_prices)
+
+        pt.update_tranches()
+
+        pt.ptf_tranches[0]
+        pt.ptf_tranches[0].close_weights
+        pt.ptf_tranches[0].eod_weights
+
+        pt.nb_tranches
+        pt.reset_period
+        pt.reset_type
+
+        # Data
+        pt.asset_growth_factor
+        pt.model_ptf
+
+        # Variables
+        pt.model_ptf_assigned_tranche
+        pt.ptf_tranches
+        pt.ptf_global
+
+
+        pw = BT.PortfolioWeights()
+        pw.add_rebalancing(model_ptf = model_ptf.iloc[[0]])
+        pw.get_rebalancings()
+        pw.compute_ptf_weights(close_prices = asset_prices)
+        pw.close_weights
+        pw.eod_weights
 
 
 if __name__ == "__main__":

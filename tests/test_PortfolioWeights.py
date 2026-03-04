@@ -13,34 +13,238 @@ import pandas as pd
 from Backtesting import BT
 
 
-class TestDailyWeights(unittest.TestCase):
+class TestPortfolioWeights(unittest.TestCase):
     """Obvious"""
 
-    def _local_test_data_weights(self):
+    def test_add_rebalancing(self):
         """Obvious"""
-        alloc_chg = np.array([[100, 200, 300, 400, 0], [0, 0, 0, 0, 0], [-10, -20, -30, -40, 100],
-                              [-10, -20, -30, -40, 100], [0, 0, 0, 0, 0], [10, -20, 30, -40, 20]])
-        close_prices = BT.Utils.generate_random_prices(n_periods=alloc_chg.shape[0], 
-                                                       n_assets=alloc_chg.shape[1], seed=1).round()
+
+        wgts = [[0.1, 0.2, 0.3, 0.4], [0.2, 0.3, 0.4, 0.1], [0.3, 0.4, 0.1, 0.2]]
+        inds = pd.to_datetime(["2025-12-31", "2026-01-31", "2026-02-28"])
+        cols = ["A", "B", "C", "D"]
+        model_ptf = pd.DataFrame(wgts, index = inds, columns = cols)
+
+        # Adding several model_portfolios
+        model_ptf_1 = model_ptf.iloc[[0, 1], 0:3]
+        model_ptf_2 = model_ptf.iloc[[2], 1:5]
+        expected = pd.concat([model_ptf_1, model_ptf_2], axis=0).fillna(0)
+        pw = BT.PortfolioWeights()
+        pw.add_rebalancing(model_ptf = model_ptf_1)
+        pw.add_rebalancing(model_ptf = model_ptf_2)
+        actual = pw.model_ptf.model_ptf
+        pd.testing.assert_frame_equal(actual, expected)
+
+    def test_get_rebalancing(self):
+        """Obvious"""
+        wgts = [[0.1, 0.2, 0.3, 0.4], [0.2, 0.3, 0.4, 0.1], [0.3, 0.4, 0.1, 0.2]]
+        inds = pd.to_datetime(["2025-12-31", "2026-01-31", "2026-02-28"])
+        cols = ["A", "B", "C", "D"]
+        model_ptf = pd.DataFrame(wgts, index = inds, columns = cols)
+        expected = model_ptf
+        pw = BT.PortfolioWeights()
+        pw.add_rebalancing(model_ptf = model_ptf)
+        actual = pw.get_rebalancings()
+        pd.testing.assert_frame_equal(actual, expected)
+
+    def test_internal_compute_ptf_weights___Erorrs(self):
+        """Obvious"""
         
-        cls_val = np.zeros((6, 5))
-        eod_val = np.zeros((6, 5))
-        eod_val[0, :] = cls_val[0, :] + alloc_chg[0, :]
-        for ii in range(1, cls_val.shape[0]):
-            # ii = 1
-            cls_val[ii, :] = eod_val[ii-1, :] * (1 + close_prices.pct_change().iloc[ii, :].values)
-            eod_val[ii, :] = cls_val[ii, :] + alloc_chg[ii, :]
-
-        close_alloc = pd.DataFrame(cls_val, index = close_prices.index, columns = close_prices.columns)
-        eod_alloc = pd.DataFrame(eod_val, index = close_prices.index, columns = close_prices.columns)
-
-        close_weights = close_alloc.div(close_alloc.sum(axis=1), axis=0)
-        eod_weights = eod_alloc.div(eod_alloc.sum(axis=1), axis=0)
-
-        return {"close_prices": close_prices, "close_alloc": close_alloc, "eod_alloc": eod_alloc,
-                "close_weights": close_weights, "eod_weights":eod_weights}
+        model_ptf = pd.DataFrame({
+            "A":[0.1, 0.2, 0.3, 0.4],
+            "B":[0.2, 0.3, 0.4, 0.1],
+            "C":[0.3, 0.4, 0.1, 0.2],
+            "D":[0.4, 0.1, 0.2, 0.3]}, 
+            index = pd.to_datetime(["2025-12-31", "2026-01-31", "2026-02-28", "2026-03-31"]))
+        close_prices = pd.DataFrame({
+            "A":[100, 101, 102, 103],
+            "B":[200, 204, 202, 206],
+            "C":[300, 303, 309, 312],
+            "D":[400, 404, 400, 408]}, 
+            index = pd.to_datetime(["2025-12-31", "2026-01-31", "2026-02-28", "2026-03-31"]))
 
 
+        # Index of asset_prices not unique
+        close_px = pd.DataFrame(index = pd.to_datetime(["2025-12-31", "2025-12-31", "2026-01-31"]),
+                                    columns = ["A", "B", "C"])
+        with self.assertRaises(ValueError) as ctx:
+            BT.PortfolioWeights()._internal_compute_ptf_weights(
+                model_ptf = model_ptf, close_prices = close_px)
+        self.assertEqual(str(ctx.exception), "Index of input 'close_prices' must be unique.")
+
+        # Columns of asset_prices not unique
+        close_px = pd.DataFrame(index = pd.to_datetime(["2025-01-31"]),
+                                    columns = ["A", "B", "A", "D"])
+        with self.assertRaises(ValueError) as ctx:
+            BT.PortfolioWeights()._internal_compute_ptf_weights(
+                model_ptf = model_ptf, close_prices = close_px)
+        self.assertEqual(str(ctx.exception), "Columns of input 'close_prices' must be unique.")
+
+        # Index of asset_prices must cover index of model portfolio
+        close_px = close_prices.set_index(pd.to_datetime(["2025-12-31", "2026-01-31", "2026-02-28", "2026-04-30"]))
+        with self.assertRaises(ValueError) as ctx:
+            BT.PortfolioWeights()._internal_compute_ptf_weights(
+                model_ptf = model_ptf, close_prices = close_px)
+        self.assertEqual(str(ctx.exception), "Index of input 'close_prices' must contain all elements of index of 'model_ptf'.")
+
+        # Columns of asset_prices must cover index of model portfolio
+        close_px = close_prices.copy()
+        close_px.columns = ["A", "B", "C", "Z"]
+        with self.assertRaises(ValueError) as ctx:
+            BT.PortfolioWeights()._internal_compute_ptf_weights(
+                model_ptf = model_ptf, close_prices = close_px)
+        self.assertEqual(str(ctx.exception), "Columns of input 'close_prices' must contain all elements of columns of 'model_ptf'.")
+
+    def test_internal_compute_ptf_weights(self):
+        """Obvious"""
+        model_ptf = pd.DataFrame({
+            "A":[0.6, 0.0, 0.4],
+            "B":[0.4, 0.6, 0.0],
+            "C":[0.0, 0.4, 0.6]}, 
+            index = pd.to_datetime(["2025-12-31", "2026-02-28", "2026-04-30"]))
+        close_prices = pd.DataFrame({
+            "A":[100, 101, 102, 103, 104, 105, 106, 107],
+            "B":[200, 204, 202, 206, 204, 208, 206, 210],
+            "C":[300, 303, 309, 318, 330, 345, 363, 384]}, 
+            index = pd.to_datetime(["2025-11-30", "2025-12-31", "2026-01-31", "2026-02-28",
+                                    "2026-03-31", "2026-04-30", "2026-05-31", "2026-06-30"]))
+
+        s_dt = "2025-12-31"
+        e_dt = "2026-02-28"
+        mpf = model_ptf.loc[s_dt]
+        rets = close_prices.loc[s_dt:e_dt, :].pct_change().fillna(0)
+        alloc = 100 * (1 + rets).cumprod().mul(mpf)
+        wgts_1 = alloc.div(alloc.sum(axis=1), axis=0)
+
+        s_dt = "2026-02-28"
+        e_dt = "2026-04-30"
+        mpf = model_ptf.loc[s_dt]
+        rets = close_prices.loc[s_dt:e_dt, :].pct_change().fillna(0)
+        alloc = 100 * (1 + rets).cumprod().mul(mpf)
+        wgts_2 = alloc.div(alloc.sum(axis=1), axis=0)
+
+        s_dt = "2026-04-30"
+        e_dt = "2026-06-30"
+        mpf = model_ptf.loc[s_dt]
+        rets = close_prices.loc[s_dt:e_dt, :].pct_change().fillna(0)
+        alloc = 100 * (1 + rets).cumprod().mul(mpf)
+        wgts_3 = alloc.div(alloc.sum(axis=1), axis=0)
+
+        # Price index not chronological
+        res = BT.PortfolioWeights._internal_compute_ptf_weights(
+            model_ptf = model_ptf, close_prices = close_prices)
+        expected_close = res["close_weights"]
+        expected_eod = res["eod_weights"]
+        res = BT.PortfolioWeights()._internal_compute_ptf_weights(
+            model_ptf = model_ptf, close_prices = close_prices.iloc[[1, 2, 3, 4, 5, 6, 7, 0], :])
+        actual_close = res["close_weights"]
+        actual_eod = res["eod_weights"]
+        pd.testing.assert_frame_equal(actual_close, expected_close)
+        pd.testing.assert_frame_equal(actual_eod, expected_eod)
+
+        # Price columns not in same order than model portfolio
+        res = BT.PortfolioWeights._internal_compute_ptf_weights(
+            model_ptf = model_ptf, close_prices = close_prices)
+        expected_close = res["close_weights"]
+        expected_eod = res["eod_weights"]
+        res = BT.PortfolioWeights()._internal_compute_ptf_weights(
+            model_ptf = model_ptf, close_prices = close_prices.iloc[:, [1, 2, 0]])
+        actual_close = res["close_weights"]
+        actual_eod = res["eod_weights"]
+        pd.testing.assert_frame_equal(actual_close, expected_close)
+        pd.testing.assert_frame_equal(actual_eod, expected_eod)
+
+
+        # Rebalancing NOT on last day
+        expected_close = pd.concat([wgts_1, wgts_2[1:], wgts_3[1:]], axis = 0)
+        expected_close.iloc[0] = np.nan
+        expected_eod = pd.concat([wgts_1[:-1], wgts_2[:-1], wgts_3], axis = 0)
+        expected_eod.iloc[-1] = np.nan        
+        pw = BT.PortfolioWeights()
+        res = pw._internal_compute_ptf_weights(model_ptf = model_ptf, close_prices = close_prices)
+        actual_close = res["close_weights"]
+        actual_eod = res["eod_weights"]
+        pd.testing.assert_frame_equal(actual_close, expected_close)
+        pd.testing.assert_frame_equal(actual_eod, expected_eod)
+
+        # Rebalancing ON last day
+        expected_close = expected_close["2025-12-31":"2026-04-30"]
+        expected_eod = expected_eod["2025-12-31":"2026-04-30"]
+
+        pw = BT.PortfolioWeights()
+        res = pw._internal_compute_ptf_weights(model_ptf = model_ptf, close_prices = close_prices[:"2026-04-30"])
+        actual_close = res["close_weights"]
+        actual_eod = res["eod_weights"]
+        pd.testing.assert_frame_equal(actual_close, expected_close)
+        pd.testing.assert_frame_equal(actual_eod, expected_eod)
+
+
+
+    def test_compute_ptf_weights(self):
+        """Obvious"""
+        model_ptf = pd.DataFrame({
+            "A":[0.6, 0.0, 0.4],
+            "B":[0.4, 0.6, 0.0],
+            "C":[0.0, 0.4, 0.6]}, 
+            index = pd.to_datetime(["2025-12-31", "2026-02-28", "2026-04-30"]))
+        close_prices = pd.DataFrame({
+            "A":[100, 101, 102, 103, 104, 105, 106, 107],
+            "B":[200, 204, 202, 206, 204, 208, 206, 210],
+            "C":[300, 303, 309, 318, 330, 345, 363, 384]}, 
+            index = pd.to_datetime(["2025-11-30", "2025-12-31", "2026-01-31", "2026-02-28",
+                                    "2026-03-31", "2026-04-30", "2026-05-31", "2026-06-30"]))
+
+        # Only one close/eod weights computation
+        res = BT.PortfolioWeights._internal_compute_ptf_weights(
+            model_ptf = model_ptf, close_prices = close_prices)
+        expected_close = res["close_weights"]
+        expected_eod = res["eod_weights"]
+        pw = BT.PortfolioWeights()
+        pw.add_rebalancing(model_ptf = model_ptf)
+        pw.compute_ptf_weights(close_prices = close_prices)
+        actual_close = pw.close_weights
+        actual_eod = pw.eod_weights
+        pd.testing.assert_frame_equal(actual_close, expected_close)
+        pd.testing.assert_frame_equal(actual_eod, expected_eod)
+
+        # Several close/eod weights computation, cut on rebalancing date
+        res = BT.PortfolioWeights._internal_compute_ptf_weights(
+            model_ptf = model_ptf, close_prices = close_prices)
+        expected_close = res["close_weights"]
+        expected_eod = res["eod_weights"]
+        model_ptf_1 = model_ptf.loc["2025-12-31":"2026-02-28"]
+        close_prices_1 = close_prices["2025-12-31":"2026-02-28"]
+        model_ptf_2 = model_ptf.loc[["2026-04-30"]]
+        close_prices_2 = close_prices["2026-02-28":]
+        pw = BT.PortfolioWeights()
+        pw.add_rebalancing(model_ptf = model_ptf_1)
+        pw.compute_ptf_weights(close_prices = close_prices_1)
+        pw.add_rebalancing(model_ptf = model_ptf_2)
+        pw.compute_ptf_weights(close_prices = close_prices_2)
+        actual_close = pw.close_weights
+        actual_eod = pw.eod_weights
+        pd.testing.assert_frame_equal(actual_close, expected_close)
+        pd.testing.assert_frame_equal(actual_eod, expected_eod)
+
+        # Several close/eod weights computation, cut NOT on rebalancing date
+        res = BT.PortfolioWeights._internal_compute_ptf_weights(
+            model_ptf = model_ptf, close_prices = close_prices)
+        expected_close = res["close_weights"]
+        expected_eod = res["eod_weights"]
+        model_ptf_1 = model_ptf.loc["2025-12-31":"2026-02-28"]
+        close_prices_1 = close_prices["2025-12-31":"2026-03-31"]
+        model_ptf_2 = model_ptf.loc[["2026-04-30"]]
+        close_prices_2 = close_prices["2026-03-31":]
+        pw = BT.PortfolioWeights()
+        pw.add_rebalancing(model_ptf = model_ptf_1)
+        pw.compute_ptf_weights(close_prices = close_prices_1)
+        pw.add_rebalancing(model_ptf = model_ptf_2)
+        pw.compute_ptf_weights(close_prices = close_prices_2)
+        actual_close = pw.close_weights
+        actual_eod = pw.eod_weights
+        pd.testing.assert_frame_equal(actual_close, expected_close)
+        pd.testing.assert_frame_equal(actual_eod, expected_eod)
+
+    # TODO: move to other class?
     def test_equal_weights(self):
         """Obvious"""
         dt = pd.to_datetime(["2025-04-01", "2025-04-02", "2025-04-03", "2025-04-04", "2025-04-05"])
@@ -56,7 +260,8 @@ class TestDailyWeights(unittest.TestCase):
         expected = pd.DataFrame(wgt, index = dt, columns=cols)
         actual = BT.PortfolioWeights.equal_weights(prices = prices)
         pd.testing.assert_frame_equal(actual, expected)
-        
+
+    # TODO: move to other class?
     def test_drifting_weights(self):
         """Obvious"""
         wgt_0 = [[0.1, 0.2, 0.3, 0.4, 0.0]]
@@ -69,18 +274,7 @@ class TestDailyWeights(unittest.TestCase):
         actual = BT.PortfolioWeights.drifting_weights(start_weights = start_weights, prices = prices)
         pd.testing.assert_frame_equal(actual, expected)
 
-    def test_compute_eod_weights(self):
-        """Obvious"""
 
-        res = self._local_test_data_weights()
-        close_prices = res["close_prices"]
-        close_weights = res["close_weights"]
-        eod_weights = res["eod_weights"]
-
-        expected = eod_weights
-        expected.iloc[-1, :] = np.nan
-        actual = BT.PortfolioWeights.compute_eod_weights(close_weights = close_weights, close_prices=close_prices)
-        pd.testing.assert_frame_equal(actual, expected)
         
 if __name__ == "__main__":
     unittest.main()

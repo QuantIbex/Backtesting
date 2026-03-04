@@ -971,24 +971,18 @@ class PortfolioWeights:
     """
     def __init__(self):
         """Instantiate class object"""
-        self.model_ptf = None
+        self._model_ptf = ModelPortfolio()
         self.close_weights = None
         self.eod_weights = None
 
-    def add_rebalancing(self, model_ptf: pd.DataFrame):
+    @property
+    def model_ptf(self):
+        """Model portfolio getter with validation."""
+        return self._model_ptf.model_ptf
+
+    def add_model_portfolio(self, model_ptf: pd.DataFrame):
         """Obvious"""
-        if self.model_ptf is None:
-            self.model_ptf = ModelPortfolio()
-
-        self.model_ptf.add_model_portfolio(model_ptf = model_ptf)
-
-    def get_rebalancings(self):
-        """Obvious"""
-
-        if self.model_ptf is None:
-            return None
-        else:
-            return self.model_ptf.model_ptf
+        self._model_ptf.add_model_portfolio(model_ptf = model_ptf)
 
     @staticmethod
     def _internal_compute_ptf_weights(model_ptf: pd.DataFrame, close_prices: pd.DataFrame) -> dict:
@@ -1065,7 +1059,7 @@ class PortfolioWeights:
 
         #### INITIALIZATION ####
 
-        rebals = self.get_rebalancings()
+        rebals = self.model_ptf
         # Warn and exit if no model portfolio
         if rebals is None:
             print("Add warning that no model portfolio")
@@ -1107,6 +1101,18 @@ class PortfolioWeights:
             self.close_weights = new_close_wgts
             self.eod_weights = new_eod_wgts
 
+    def get_turnover(self, rebalancings_only = False) -> pd.DataFrame:
+        """Obvious"""
+
+        # Return nothing if portfolio weights are missing
+        if self.eod_weights is None:
+            return
+
+        turnover = self.eod_weights - self.close_weights
+        if rebalancings_only:
+            turnover = turnover.loc[self.model_ptf.index]
+        
+        return turnover
 
     # TODO: Move this method to Weights class
     @staticmethod

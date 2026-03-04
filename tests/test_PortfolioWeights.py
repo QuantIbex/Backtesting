@@ -16,9 +16,17 @@ from Backtesting import BT
 class TestPortfolioWeights(unittest.TestCase):
     """Obvious"""
 
-    def test_add_rebalancing(self):
+    def test_init(self):
         """Obvious"""
+        pw = BT.PortfolioWeights()
+        self.assertTrue(isinstance(pw._model_ptf, BT.ModelPortfolio))
+        self.assertIsNone(pw.model_ptf)
+        self.assertIsNone(pw.eod_weights)
+        self.assertIsNone(pw.close_weights)
 
+    def test_add_model_portfolio(self):
+        """Obvious"""
+        
         wgts = [[0.1, 0.2, 0.3, 0.4], [0.2, 0.3, 0.4, 0.1], [0.3, 0.4, 0.1, 0.2]]
         inds = pd.to_datetime(["2025-12-31", "2026-01-31", "2026-02-28"])
         cols = ["A", "B", "C", "D"]
@@ -29,9 +37,9 @@ class TestPortfolioWeights(unittest.TestCase):
         model_ptf_2 = model_ptf.iloc[[2], 1:5]
         expected = pd.concat([model_ptf_1, model_ptf_2], axis=0).fillna(0)
         pw = BT.PortfolioWeights()
-        pw.add_rebalancing(model_ptf = model_ptf_1)
-        pw.add_rebalancing(model_ptf = model_ptf_2)
-        actual = pw.model_ptf.model_ptf
+        pw.add_model_portfolio(model_ptf = model_ptf_1)
+        pw.add_model_portfolio(model_ptf = model_ptf_2)
+        actual = pw.model_ptf
         pd.testing.assert_frame_equal(actual, expected)
 
     def test_get_rebalancing(self):
@@ -42,8 +50,8 @@ class TestPortfolioWeights(unittest.TestCase):
         model_ptf = pd.DataFrame(wgts, index = inds, columns = cols)
         expected = model_ptf
         pw = BT.PortfolioWeights()
-        pw.add_rebalancing(model_ptf = model_ptf)
-        actual = pw.get_rebalancings()
+        pw.add_model_portfolio(model_ptf = model_ptf)
+        actual = pw.model_ptf
         pd.testing.assert_frame_equal(actual, expected)
 
     def test_internal_compute_ptf_weights___Erorrs(self):
@@ -177,8 +185,6 @@ class TestPortfolioWeights(unittest.TestCase):
         pd.testing.assert_frame_equal(actual_close, expected_close)
         pd.testing.assert_frame_equal(actual_eod, expected_eod)
 
-
-
     def test_compute_ptf_weights(self):
         """Obvious"""
         model_ptf = pd.DataFrame({
@@ -199,7 +205,7 @@ class TestPortfolioWeights(unittest.TestCase):
         expected_close = res["close_weights"]
         expected_eod = res["eod_weights"]
         pw = BT.PortfolioWeights()
-        pw.add_rebalancing(model_ptf = model_ptf)
+        pw.add_model_portfolio(model_ptf = model_ptf)
         pw.compute_ptf_weights(close_prices = close_prices)
         actual_close = pw.close_weights
         actual_eod = pw.eod_weights
@@ -216,9 +222,9 @@ class TestPortfolioWeights(unittest.TestCase):
         model_ptf_2 = model_ptf.loc[["2026-04-30"]]
         close_prices_2 = close_prices["2026-02-28":]
         pw = BT.PortfolioWeights()
-        pw.add_rebalancing(model_ptf = model_ptf_1)
+        pw.add_model_portfolio(model_ptf = model_ptf_1)
         pw.compute_ptf_weights(close_prices = close_prices_1)
-        pw.add_rebalancing(model_ptf = model_ptf_2)
+        pw.add_model_portfolio(model_ptf = model_ptf_2)
         pw.compute_ptf_weights(close_prices = close_prices_2)
         actual_close = pw.close_weights
         actual_eod = pw.eod_weights
@@ -235,14 +241,60 @@ class TestPortfolioWeights(unittest.TestCase):
         model_ptf_2 = model_ptf.loc[["2026-04-30"]]
         close_prices_2 = close_prices["2026-03-31":]
         pw = BT.PortfolioWeights()
-        pw.add_rebalancing(model_ptf = model_ptf_1)
+        pw.add_model_portfolio(model_ptf = model_ptf_1)
         pw.compute_ptf_weights(close_prices = close_prices_1)
-        pw.add_rebalancing(model_ptf = model_ptf_2)
+        pw.add_model_portfolio(model_ptf = model_ptf_2)
         pw.compute_ptf_weights(close_prices = close_prices_2)
         actual_close = pw.close_weights
         actual_eod = pw.eod_weights
         pd.testing.assert_frame_equal(actual_close, expected_close)
         pd.testing.assert_frame_equal(actual_eod, expected_eod)
+
+    def test_get_turnover(self):
+        """Obvious"""
+        model_ptf = pd.DataFrame({
+            "A":[0.6, 0.0, 0.4],
+            "B":[0.4, 0.6, 0.0],
+            "C":[0.0, 0.4, 0.6]}, 
+            index = pd.to_datetime(["2025-12-31", "2026-02-28", "2026-04-30"]))
+        close_prices = pd.DataFrame({
+            "A":[100, 101, 102, 103, 104, 105, 106, 107],
+            "B":[200, 204, 202, 206, 204, 208, 206, 210],
+            "C":[300, 303, 309, 318, 330, 345, 363, 384]}, 
+            index = pd.to_datetime(["2025-11-30", "2025-12-31", "2026-01-31", "2026-02-28",
+                                    "2026-03-31", "2026-04-30", "2026-05-31", "2026-06-30"]))
+
+        # Default values
+        pw = BT.PortfolioWeights()
+        pw.add_model_portfolio(model_ptf = model_ptf)
+        pw.compute_ptf_weights(close_prices = close_prices)
+        expected = pw.get_turnover()
+        actual = pw.get_turnover(rebalancings_only = False)
+        pd.testing.assert_frame_equal(actual, expected)
+
+        # No turnover to compute
+        pw = BT.PortfolioWeights()
+        actual = pw.get_turnover()
+        self.assertIsNone(actual)
+
+        # NOT restrited to rebalancings
+        pw = BT.PortfolioWeights()
+        pw.add_model_portfolio(model_ptf = model_ptf)
+        pw.compute_ptf_weights(close_prices = close_prices)
+        expected = pw.eod_weights - pw.close_weights
+        actual = pw.get_turnover(rebalancings_only = False)
+        pd.testing.assert_frame_equal(actual, expected)
+
+        # Restrited to rebalancings
+        pw = BT.PortfolioWeights()
+        pw.add_model_portfolio(model_ptf = model_ptf)
+        pw.compute_ptf_weights(close_prices = close_prices)
+        expected = pw.eod_weights - pw.close_weights
+        expected = expected.loc[model_ptf.index]
+        actual = pw.get_turnover(rebalancings_only = True)
+        pd.testing.assert_frame_equal(actual, expected)
+
+
 
     # TODO: move to other class?
     def test_equal_weights(self):

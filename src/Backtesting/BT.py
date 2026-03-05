@@ -1159,47 +1159,46 @@ class PortfolioTranches:
     def __init__(self, nb_tranches: int = 1, reset_period: str = None, reset_type: str = None):
         """Instantiate class object"""
 
-        # Parameters
-        self.nb_tranches = None
-        self.reset_period = None
-        self.reset_type = None
-
-        # Data
-        self._model_ptf = ModelPortfolio()
-        self.asset_growth_factor = None
-        
-        # Variables
-        self.model_ptf_assigned_tranche = None
-        self.ptf_tranches = None
-        self.ptf_global = None
-
-
         # Handle nb_tranches parameter
         if not isinstance(nb_tranches, int):
-            raise TypeError("Input 'nb_specs' must be an integer.")
+            raise TypeError("Input 'nb_tranches' must be an integer.")
         
         if not nb_tranches > 0:
-            raise ValueError("Input 'nb_specs' must be positive.")
-        
-        self.nb_tranches = nb_tranches
+            raise ValueError("Input 'nb_tranches' must be positive.")
         
         # Handle reset_period parameter
         if nb_tranches == 1:
             if reset_period is not None:
                 warnings.warn("Discarding input 'reset_period' and setting to 'None'.", UserWarning)
+                reset_period = None
         else:
             if reset_period not in (None, 1, nb_tranches):
                 raise ValueError("Input 'nb_tranches' must be either 'None', '1' or equal to 'nb_tranches'.")
-            self.reset_period = reset_period
-
+            
         # Handle reset_type parameter
-        if self.reset_period is None:
+        if reset_period is None:
             if reset_type is not None:
                 warnings.warn("Discarding input 'reset_type' and setting to 'None'.", UserWarning)
+                reset_type = None
         else:
-            if reset_type not in (None,"equally-weighted"):
+            if reset_type not in (None, "equally-weighted"):
                 raise ValueError("Input 'reset_type' must be either 'None' or 'equally-weighted'.")
-            self.reset_type = "equally-weighted"
+            reset_type = "equally-weighted"
+
+        # Parameters
+        self.nb_tranches = nb_tranches
+        self.reset_period = reset_period
+        self.reset_type = reset_type
+
+        # Data
+        self._model_ptf = ModelPortfolio()
+        self.asset_growth_factor = None # Replace by asset prices class
+        
+        # Variables
+        self.model_ptf_assigned_tranche = None
+        self.ptf_tranches = [PortfolioWeights() for _ in range(nb_tranches)]
+        self.ptf_global = PortfolioWeights()
+
 
     @property
     def model_ptf(self):
@@ -1260,40 +1259,41 @@ class PortfolioTranches:
 
     def update_tranches(self):
         """ """
+
+        if self.model_ptf is None:
+            # Nothing to do
+            return
         
         self._update_model_ptf_assigned_tranche()
-
 
         # Initializing tranches
         if self.ptf_tranches is None:
             self.ptf_tranches = [None] * self.nb_tranches
             for ii in range(self.nb_tranches):
-                print(f"Initializing tranch {ii}")
                 self.ptf_tranches[ii] = PortfolioWeights()
 
             new_rebals = self.model_ptf
             new_prices = self.asset_growth_factor
             new_pft_assigned_tranches = self.model_ptf_assigned_tranche
         else:
-            
-            last_avail_date = self.ptf_tranches[0].model_ptf.index[-1]
-            mask = self.model_ptf.index.values > last_avail_date 
+            last_avail_date = self.ptf_tranches[0].close_weights.index[-1]
+            mask = self.model_ptf.index.values > last_avail_date
             new_rebals = self.model_ptf[mask]
-            new_prices = None # TODO: code this
+            new_prices = None       # TODO: code this
             new_pft_assigned_tranches = None # TODO: code this
 
         # Update tranches
         for ii in range(self.nb_tranches):
             print(f"Handling tranche {ii}")
             
+            # Update tranche model portfolio
             mask = new_pft_assigned_tranches == ii
-            ii_new_rebals = new_rebals[mask]
-            print(ii_new_rebals)
-            
-            self.ptf_tranches[ii].add_model_portfolio(model_ptf = ii_new_rebals)
+            if mask.any():
+                ii_new_rebals = new_rebals[mask]
+                self.ptf_tranches[ii].add_model_portfolio(model_ptf = ii_new_rebals)
 
+            # Update tranche portfolio weights
             self.ptf_tranches[ii].compute_ptf_weights(close_prices = new_prices)
-            print(self.ptf_tranches[ii].close_weights)
 
 
 

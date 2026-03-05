@@ -19,11 +19,11 @@ class TestPortfolioTranches(unittest.TestCase):
         """Obvious"""
         with self.assertRaises(TypeError) as ctx:
             pt = BT.PortfolioTranches(nb_tranches = 3.0)
-        self.assertEqual(str(ctx.exception), "Input 'nb_specs' must be an integer.")
+        self.assertEqual(str(ctx.exception), "Input 'nb_tranches' must be an integer.")
 
         with self.assertRaises(ValueError) as ctx:
             pt = BT.PortfolioTranches(nb_tranches = -2)
-        self.assertEqual(str(ctx.exception), "Input 'nb_specs' must be positive.")
+        self.assertEqual(str(ctx.exception), "Input 'nb_tranches' must be positive.")
 
         with self.assertRaises(ValueError) as ctx:
             pt = BT.PortfolioTranches(nb_tranches = 3, reset_period = 4)
@@ -46,7 +46,7 @@ class TestPortfolioTranches(unittest.TestCase):
     def test_Init_Defaults(self):
         """Obvious"""
         actual = BT.PortfolioTranches()
-        expected = BT.PortfolioTranches(nb_tranches = 1, reset_period = None, reset_type = None )
+        expected = BT.PortfolioTranches(nb_tranches = 1, reset_period = None, reset_type = None)
         self.assertEqual(actual.nb_tranches, expected.nb_tranches)
         self.assertEqual(actual.reset_period, expected.reset_period)
         self.assertEqual(actual.reset_type, expected.reset_type)
@@ -58,6 +58,12 @@ class TestPortfolioTranches(unittest.TestCase):
         self.assertIsNone(pt.reset_period)
         self.assertIsNone(pt.reset_type)
         self.assertTrue(isinstance(pt._model_ptf, BT.ModelPortfolio))
+        self.assertTrue(isinstance(pt._model_ptf, BT.ModelPortfolio))
+        self.assertIsNone(pt.asset_growth_factor)
+        self.assertIsNone(pt.model_ptf_assigned_tranche)
+        self.assertTrue(all([isinstance(x, BT.PortfolioWeights) for x in pt.ptf_tranches]))
+        self.assertTrue(isinstance(pt.ptf_global, BT.PortfolioWeights))
+        
 
         pt = BT.PortfolioTranches(nb_tranches = 3, reset_period = 1, reset_type = "equally-weighted")
         self.assertEqual(pt.nb_tranches, 3)
@@ -290,7 +296,7 @@ class TestPortfolioTranches(unittest.TestCase):
     def NOT_test_update_tranches(self):
         """Obvious"""
 
-        inds = pd.to_datetime(["2025-11-30", "2025-12-31", "2026-01-31", 
+        inds = pd.to_datetime(["2025-11-30", "2025-12-31", "2026-01-31",
                                "2026-02-28", "2026-03-31", "2026-04-30",
                                "2026-05-31"])
         asset_prices = pd.DataFrame(
@@ -298,23 +304,34 @@ class TestPortfolioTranches(unittest.TestCase):
              "B": [200, 204, 202, 208, 206, 210, 208],
              "C": [300, 303, 309, 318, 330, 345, 363],
              "D": [400, 404, 400, 404, 400, 404, 400]}, index = inds)
-
         model_ptf = pd.DataFrame(
             {"A": [0.1, 0.2, 0.3],
              "B": [0.2, 0.3, 0.4],
              "C": [0.3, 0.4, 0.1],
              "D": [0.4, 0.1, 0.2]}, index = inds[[1, 3, 5]])
 
-
-        pt = BT.PortfolioTranches(nb_tranches = 3)
-        pt.add_model_portfolio(model_ptf = model_ptf)
-        pt.add_asset_prices(asset_prices = asset_prices)
-
+        model_ptf_1 = model_ptf.loc[:"2026-02-28", :]
+        model_ptf_2 = model_ptf.loc["2026-04-30":, :]
+        asset_prices_1 = asset_prices.loc[:"2026-02-28", :]
+        asset_prices_2 = asset_prices.loc["2026-02-28":, :]
+        
+        pt = BT.PortfolioTranches(nb_tranches = 4)
+        pt.add_model_portfolio(model_ptf = model_ptf_1)
+        pt.add_asset_prices(asset_prices = asset_prices_1)
         pt.update_tranches()
+        pt.add_model_portfolio(model_ptf = model_ptf_2)
+        pt.add_asset_prices(asset_prices = asset_prices_2)
+        pt.update_tranches()
+
+        pt.model_ptf.index
 
         pt.ptf_tranches[0]
         pt.ptf_tranches[0].close_weights
         pt.ptf_tranches[0].eod_weights
+
+
+
+
 
         # Data
         pt.asset_growth_factor
@@ -326,12 +343,6 @@ class TestPortfolioTranches(unittest.TestCase):
         pt.ptf_global
 
 
-        pw = BT.PortfolioWeights()
-        pw.add_model_portfolio(model_ptf = model_ptf.iloc[[0]])
-        pw.get_rebalancings()
-        pw.compute_ptf_weights(close_prices = asset_prices)
-        pw.close_weights
-        pw.eod_weights
 
 
 if __name__ == "__main__":

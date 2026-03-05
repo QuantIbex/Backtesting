@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 from Backtesting import BT
 
-
 class TestPortfolioWeights(unittest.TestCase):
     """Obvious"""
 
@@ -54,7 +53,7 @@ class TestPortfolioWeights(unittest.TestCase):
         actual = pw.model_ptf
         pd.testing.assert_frame_equal(actual, expected)
 
-    def test_internal_compute_ptf_weights___Erorrs(self):
+    def test_internal_compute_ptf_weights___Errors(self):
         """Obvious"""
         
         model_ptf = pd.DataFrame({
@@ -185,6 +184,43 @@ class TestPortfolioWeights(unittest.TestCase):
         pd.testing.assert_frame_equal(actual_close, expected_close)
         pd.testing.assert_frame_equal(actual_eod, expected_eod)
 
+    def test_compute_ptf_weights___Errors(self):
+        """Obvious"""
+
+        model_ptf = pd.DataFrame({
+            "A":[0.6, 0.0, 0.4],
+            "B":[0.4, 0.6, 0.0],
+            "C":[0.0, 0.4, 0.6]}, 
+            index = pd.to_datetime(["2025-12-31", "2026-02-28", "2026-04-30"]))
+        close_prices = pd.DataFrame({
+            "A":[100, 101, 102, 103, 104, 105, 106, 107],
+            "B":[200, 204, 202, 206, 204, 208, 206, 210],
+            "C":[300, 303, 309, 318, 330, 345, 363, 384]}, 
+            index = pd.to_datetime(["2025-11-30", "2025-12-31", "2026-01-31", "2026-02-28",
+                                    "2026-03-31", "2026-04-30", "2026-05-31", "2026-06-30"]))
+
+        # Close prices start after last available portfolio weight
+        model_ptf_1 = model_ptf.loc["2025-12-31":"2026-02-28"]
+        close_prices_1 = close_prices["2025-12-31":"2026-02-28"]
+        model_ptf_2 = model_ptf.loc[["2026-04-30"]]
+        close_prices_2 = close_prices["2026-05-31":]
+        pw = BT.PortfolioWeights()
+        pw.add_model_portfolio(model_ptf = model_ptf_1)
+        pw.compute_ptf_weights(close_prices = close_prices_1)
+        pw.add_model_portfolio(model_ptf = model_ptf_2)
+        with self.assertRaises(ValueError) as ctx:
+            pw.compute_ptf_weights(close_prices = close_prices_2)
+        self.assertEqual(str(ctx.exception), 
+                         "Input 'close_prices' must start at latest from last available "
+                         "portfolio weights.")
+        model_ptf_1 = model_ptf.loc[["2026-02-28"]]
+        close_prices_1 = close_prices["2025-12-31":"2026-02-28"]
+        pw = BT.PortfolioWeights()
+        pw.add_model_portfolio(model_ptf = model_ptf_1)
+        pw.compute_ptf_weights(close_prices = close_prices_1)
+        pw.close_weights
+        pw.eod_weights
+
     def test_compute_ptf_weights(self):
         """Obvious"""
         model_ptf = pd.DataFrame({
@@ -198,6 +234,19 @@ class TestPortfolioWeights(unittest.TestCase):
             "C":[300, 303, 309, 318, 330, 345, 363, 384]}, 
             index = pd.to_datetime(["2025-11-30", "2025-12-31", "2026-01-31", "2026-02-28",
                                     "2026-03-31", "2026-04-30", "2026-05-31", "2026-06-30"]))
+
+        # Only one rebalancing and prices end on rebalancing date
+        model_ptf_1 = model_ptf.loc[["2025-12-31"]]
+        close_prices_1 = close_prices["2025-11-30":"2025-12-31"]
+        expected_close = pd.DataFrame(index = model_ptf_1.index, columns = model_ptf_1.columns)
+        expected_eod = model_ptf_1.copy()
+        pw = BT.PortfolioWeights()
+        pw.add_model_portfolio(model_ptf = model_ptf_1)
+        pw.compute_ptf_weights(close_prices = close_prices_1)
+        actual_close = pw.close_weights
+        actual_eod = pw.eod_weights
+        pd.testing.assert_frame_equal(actual_close, expected_close)
+        pd.testing.assert_frame_equal(actual_eod, expected_eod)
 
         # Only one close/eod weights computation
         res = BT.PortfolioWeights._internal_compute_ptf_weights(
@@ -294,8 +343,6 @@ class TestPortfolioWeights(unittest.TestCase):
         actual = pw.get_turnover(rebalancings_only = True)
         pd.testing.assert_frame_equal(actual, expected)
 
-
-
     # TODO: move to other class?
     def test_equal_weights(self):
         """Obvious"""
@@ -330,3 +377,5 @@ class TestPortfolioWeights(unittest.TestCase):
         
 if __name__ == "__main__":
     unittest.main()
+
+# %%

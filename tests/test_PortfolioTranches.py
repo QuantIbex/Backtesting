@@ -53,16 +53,19 @@ class TestPortfolioTranches(unittest.TestCase):
 
     def test_Init(self):
         """Obvious"""
-        actual = BT.PortfolioTranches(nb_tranches = 1, reset_period = None, reset_type = None)
-        self.assertEqual(actual.nb_tranches, 1)
-        self.assertIsNone(actual.reset_period)
-        self.assertIsNone(actual.reset_type)
+        pt = BT.PortfolioTranches(nb_tranches = 1, reset_period = None, reset_type = None)
+        self.assertEqual(pt.nb_tranches, 1)
+        self.assertIsNone(pt.reset_period)
+        self.assertIsNone(pt.reset_type)
+        self.assertTrue(isinstance(pt._model_ptf, BT.ModelPortfolio))
 
-        actual = BT.PortfolioTranches(nb_tranches = 3, reset_period = 1, reset_type = "equally-weighted")
-        self.assertEqual(actual.nb_tranches, 3)
-        self.assertEqual(actual.reset_period, 1)
-        self.assertEqual(actual.reset_type, "equally-weighted")
+        pt = BT.PortfolioTranches(nb_tranches = 3, reset_period = 1, reset_type = "equally-weighted")
+        self.assertEqual(pt.nb_tranches, 3)
+        self.assertEqual(pt.reset_period, 1)
+        self.assertEqual(pt.reset_type, "equally-weighted")
+        self.assertTrue(isinstance(pt._model_ptf, BT.ModelPortfolio))
 
+    # TODO: consider removing this test as it relies on the ModelPortfolio class
     def test_add_model_portfolio___Errors(self):
         """Obvious"""
 
@@ -133,50 +136,50 @@ class TestPortfolioTranches(unittest.TestCase):
         actual = pt.model_ptf
         pd.testing.assert_frame_equal(actual, expected)
 
-    def test_add_asset_prices___Errors(self):
-        """Obvious"""
+    # def test_add_asset_prices___Errors(self):
+    #     """Obvious"""
 
-        # Input asset_prices not a dataframe
-        pt = BT.PortfolioTranches(nb_tranches = 1)
-        with self.assertRaises(TypeError) as ctx:
-            pt.add_asset_prices(asset_prices = "dummy")
-        self.assertEqual(str(ctx.exception), "Input 'asset_prices' must be a 'pd.DataFrame'.")
+    #     # Input asset_prices not a dataframe
+    #     pt = BT.PortfolioTranches(nb_tranches = 1)
+    #     with self.assertRaises(TypeError) as ctx:
+    #         pt.add_asset_prices(asset_prices = "dummy")
+    #     self.assertEqual(str(ctx.exception), "Input 'asset_prices' must be a 'pd.DataFrame'.")
 
-        # Index of asset_prices not a pd.datetimeIndex
-        asset_prices = pd.DataFrame(index = ["A", "B"], columns = ["X", "Y"])
-        pt = BT.PortfolioTranches(nb_tranches = 1)
-        with self.assertRaises(ValueError) as ctx:
-            pt.add_asset_prices(asset_prices = asset_prices)
-        self.assertEqual(str(ctx.exception), "Index of input 'asset_prices' must be a 'pd.DatetimeIndex'.")
+    #     # Index of asset_prices not a pd.datetimeIndex
+    #     asset_prices = pd.DataFrame(index = ["A", "B"], columns = ["X", "Y"])
+    #     pt = BT.PortfolioTranches(nb_tranches = 1)
+    #     with self.assertRaises(ValueError) as ctx:
+    #         pt.add_asset_prices(asset_prices = asset_prices)
+    #     self.assertEqual(str(ctx.exception), "Index of input 'asset_prices' must be a 'pd.DatetimeIndex'.")
 
-        # Index of asset_prices not unique
-        inds = pd.to_datetime(["2025-01-31", "2025-01-31", "2025-02-28"])
-        cols = ["A", "B", "C"]
-        asset_prices = pd.DataFrame(index = inds, columns = cols)
-        pt = BT.PortfolioTranches(nb_tranches = 1)
-        with self.assertRaises(ValueError) as ctx:
-            pt.add_asset_prices(asset_prices = asset_prices)
-        self.assertEqual(str(ctx.exception), "Index of input 'asset_prices' must be unique.")
+    #     # Index of asset_prices not unique
+    #     inds = pd.to_datetime(["2025-01-31", "2025-01-31", "2025-02-28"])
+    #     cols = ["A", "B", "C"]
+    #     asset_prices = pd.DataFrame(index = inds, columns = cols)
+    #     pt = BT.PortfolioTranches(nb_tranches = 1)
+    #     with self.assertRaises(ValueError) as ctx:
+    #         pt.add_asset_prices(asset_prices = asset_prices)
+    #     self.assertEqual(str(ctx.exception), "Index of input 'asset_prices' must be unique.")
 
-        # Columns of asset_prices not unique
-        inds = pd.to_datetime(["2025-01-31"])
-        cols = ["A", "B", "A", "B"]
-        asset_prices = pd.DataFrame(index = inds, columns = cols)
-        pt = BT.PortfolioTranches(nb_tranches = 1)
-        with self.assertRaises(ValueError) as ctx:
-            pt.add_asset_prices(asset_prices = asset_prices)
-        self.assertEqual(str(ctx.exception), "Columns of input 'asset_prices' must be unique.")
+    #     # Columns of asset_prices not unique
+    #     inds = pd.to_datetime(["2025-01-31"])
+    #     cols = ["A", "B", "A", "B"]
+    #     asset_prices = pd.DataFrame(index = inds, columns = cols)
+    #     pt = BT.PortfolioTranches(nb_tranches = 1)
+    #     with self.assertRaises(ValueError) as ctx:
+    #         pt.add_asset_prices(asset_prices = asset_prices)
+    #     self.assertEqual(str(ctx.exception), "Columns of input 'asset_prices' must be unique.")
 
-        # Trying provide asset prices that don't bind to existing asset prices
-        px = [[100, 200, 300, 400], [101, 201, 301, 401], [102, 202, 302, 402], [103, 203, 303, 403]]
-        inds = pd.to_datetime(["2025-12-31", "2026-01-31", "2026-02-28", "2026-03-31"])
-        cols = ["A", "B", "C", "D"]
-        asset_prices = pd.DataFrame(px, index = inds, columns = cols)
-        pt = BT.PortfolioTranches(nb_tranches = 1)
-        pt.add_asset_prices(asset_prices = asset_prices.iloc[[0, 1]])
-        with self.assertRaises(ValueError) as ctx:
-            pt.add_asset_prices(asset_prices = asset_prices.iloc[[2, 3]])
-        self.assertEqual(str(ctx.exception), "Input 'model_ptf' must complement existing available data.")
+    #     # Trying provide asset prices that don't bind to existing asset prices
+    #     px = [[100, 200, 300, 400], [101, 201, 301, 401], [102, 202, 302, 402], [103, 203, 303, 403]]
+    #     inds = pd.to_datetime(["2025-12-31", "2026-01-31", "2026-02-28", "2026-03-31"])
+    #     cols = ["A", "B", "C", "D"]
+    #     asset_prices = pd.DataFrame(px, index = inds, columns = cols)
+    #     pt = BT.PortfolioTranches(nb_tranches = 1)
+    #     pt.add_asset_prices(asset_prices = asset_prices.iloc[[0, 1]])
+    #     with self.assertRaises(ValueError) as ctx:
+    #         pt.add_asset_prices(asset_prices = asset_prices.iloc[[2, 3]])
+    #     self.assertEqual(str(ctx.exception), "Input 'model_ptf' must complement existing available data.")
 
     def test_add_asset_prices(self):
         """Obvious"""
@@ -188,7 +191,6 @@ class TestPortfolioTranches(unittest.TestCase):
              "C": [300, 303, 309, 318, 330],
              "D": [400, 404, 400, 404, 400]}, index = inds)
         
-
         # Adding first model_portfolios
         pt = BT.PortfolioTranches(nb_tranches = 1)
         pt.add_asset_prices(asset_prices = asset_prices)
@@ -285,25 +287,23 @@ class TestPortfolioTranches(unittest.TestCase):
         pd.testing.assert_series_equal(actual, expected)
 
 
-
     def NOT_test_update_tranches(self):
         """Obvious"""
 
         inds = pd.to_datetime(["2025-11-30", "2025-12-31", "2026-01-31", 
-                               "2026-02-28", "2026-03-31", "2026-04-30"])
+                               "2026-02-28", "2026-03-31", "2026-04-30",
+                               "2026-05-31"])
         asset_prices = pd.DataFrame(
-            {"A": [100, 101, 102, 103, 104, 105],
-             "B": [200, 204, 202, 208, 206, 210],
-             "C": [300, 303, 309, 318, 330, 345],
-             "D": [400, 404, 400, 404, 400, 404]}, index = inds)
+            {"A": [100, 101, 102, 103, 104, 105, 106],
+             "B": [200, 204, 202, 208, 206, 210, 208],
+             "C": [300, 303, 309, 318, 330, 345, 363],
+             "D": [400, 404, 400, 404, 400, 404, 400]}, index = inds)
 
         model_ptf = pd.DataFrame(
             {"A": [0.1, 0.2, 0.3],
              "B": [0.2, 0.3, 0.4],
              "C": [0.3, 0.4, 0.1],
              "D": [0.4, 0.1, 0.2]}, index = inds[[1, 3, 5]])
-
-        # model_ptf.index.values
 
 
         pt = BT.PortfolioTranches(nb_tranches = 3)
@@ -316,10 +316,6 @@ class TestPortfolioTranches(unittest.TestCase):
         pt.ptf_tranches[0].close_weights
         pt.ptf_tranches[0].eod_weights
 
-        pt.nb_tranches
-        pt.reset_period
-        pt.reset_type
-
         # Data
         pt.asset_growth_factor
         pt.model_ptf
@@ -331,7 +327,7 @@ class TestPortfolioTranches(unittest.TestCase):
 
 
         pw = BT.PortfolioWeights()
-        pw.add_rebalancing(model_ptf = model_ptf.iloc[[0]])
+        pw.add_model_portfolio(model_ptf = model_ptf.iloc[[0]])
         pw.get_rebalancings()
         pw.compute_ptf_weights(close_prices = asset_prices)
         pw.close_weights

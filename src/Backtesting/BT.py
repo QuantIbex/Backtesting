@@ -993,7 +993,7 @@ class PortfolioWeights:
         # Check that close prices index are unique
         if not len(close_prices.index) == len(close_prices.index.unique()):
             raise ValueError("Index of input 'close_prices' must be unique.")
-        
+
         # Check that close prices columns are unique
         if not len(close_prices.columns) == len(close_prices.columns.unique()):
             raise ValueError("Columns of input 'close_prices' must be unique.")
@@ -1037,18 +1037,28 @@ class PortfolioWeights:
                 start_weights = ii_start_wgt, prices = ii_prices)
             close_wgt_lst[ii] = ii_drift_wgt[1:]
             eod_wgt_lst[ii] = ii_drift_wgt[:-1]
-
+        
         # Concatenate close weights
-        close_weights = pd.concat(close_wgt_lst, axis=0)
-        close_weights.loc[period_dates[0]] = np.full(close_weights.shape[1], np.nan)
-        close_weights.sort_index(ascending = True, inplace = True)
+        if not close_wgt_lst:
+            # List is empty. Occurs when only 1 rebalancing and no prices after
+            # rebalancing day
+            close_weights = pd.DataFrame(index = model_ptf.index, columns = model_ptf.columns)
+        else:
+            close_weights = pd.concat(close_wgt_lst, axis=0)
+            close_weights.loc[period_dates[0]] = np.full(close_weights.shape[1], np.nan)
+            close_weights.sort_index(ascending = True, inplace = True)
 
         # Concatenate end-of-day weights
-        eod_weights = pd.concat(eod_wgt_lst, axis=0)
-        if model_ptf.index[-1] < close_prices.index[-1]:
-            eod_weights.loc[period_dates[-1]] = np.full(close_weights.shape[1], np.nan)
+        if not eod_wgt_lst:
+            # List is empty. Occurs when only 1 rebalancing and no prices after
+            # rebalancing day
+            eod_weights = model_ptf.copy()
         else:
-            eod_weights.loc[period_dates[-1]] = model_ptf.loc[period_dates[-1]].values
+            eod_weights = pd.concat(eod_wgt_lst, axis=0)
+            if model_ptf.index[-1] < close_prices.index[-1]:
+                eod_weights.loc[period_dates[-1]] = np.full(close_weights.shape[1], np.nan)
+            else:
+                eod_weights.loc[period_dates[-1]] = model_ptf.loc[period_dates[-1]].values
 
         return {"close_weights": close_weights,
                 "eod_weights": eod_weights}
@@ -1059,32 +1069,35 @@ class PortfolioWeights:
 
         #### INITIALIZATION ####
 
-        rebals = self.model_ptf
         # Warn and exit if no model portfolio
-        if rebals is None:
+        if self.model_ptf is None:
             print("Add warning that no model portfolio")
             return
 
         # Get model portfolios to use
         if self.close_weights is None:
-            model_ptf = rebals
+            model_ptf = self.model_ptf
         else:
             # Warn and exit if no new model portfolio to update weights
-            if rebals.index[-1] < self.close_weights.index[-1]:
+            if self.model_ptf.index[-1] < self.close_weights.index[-1]:
                 print("Add warning: no new model portfolio")
                 return
 
+            # Close prices must start at latest on last available portfolio weight
+            if self.close_weights.index[-1] < close_prices.index[0]:
+                raise ValueError("Input 'close_prices' must start at latest from last available "
+                                 "portfolio weights.")            
+
             # Use only rebalancings unused in previously computed close/eod weights
-            mask = rebals.index >= self.close_weights.index[-1]
-            model_ptf = rebals[mask]
+            mask = self.model_ptf.index >= self.close_weights.index[-1]
+            model_ptf = self.model_ptf[mask]
 
             # Add starting weights if rebalancings not on day of previously computed close/eod weights
             if model_ptf.index[0] > self.close_weights.index[-1]:
                 model_ptf = pd.concat([self.close_weights.iloc[[-1]], model_ptf], axis = 0)
 
         # TODO: check that prices available if weights > 0
-        # TODO: Check that rebalancings start on of after last available close/eod date
-        # TODO: Check that prices start on end date of existing weights
+        # TODO: Check that rebalancings start on of after last available close/eod date        
 
         #### COMPUTE PORTFOLIO WEIGHTS ####
 
@@ -1152,9 +1165,9 @@ class PortfolioTranches:
         self.reset_type = None
 
         # Data
+        self._model_ptf = ModelPortfolio()
         self.asset_growth_factor = None
-        self.model_ptf = None
-
+        
         # Variables
         self.model_ptf_assigned_tranche = None
         self.ptf_tranches = None
@@ -1188,7 +1201,11 @@ class PortfolioTranches:
                 raise ValueError("Input 'reset_type' must be either 'None' or 'equally-weighted'.")
             self.reset_type = "equally-weighted"
 
-    # TODO: remove this and use dedicated class
+    @property
+    def model_ptf(self):
+        """Model portfolio getter with validation."""
+        return self._model_ptf.model_ptf
+
     def add_model_portfolio(self, model_ptf: pd.DataFrame):
         """ """
         if not isinstance(model_ptf, pd.DataFrame):
@@ -1208,12 +1225,7 @@ class PortfolioTranches:
             model_ptf.sort_index(ascending = True, inplace = True)
 
         # Update model portfolio
-        if self.model_ptf is None:
-            self.model_ptf = model_ptf
-        else:
-            if self.model_ptf.index[-1] >= model_ptf.index[0]:
-                raise ValueError("Index of input 'model_ptf' must be posterior to existing model portfolios.")
-            self.model_ptf = pd.concat([self.model_ptf, model_ptf], axis=0).fillna(0)
+        self._model_ptf.add_model_portfolio(model_ptf = model_ptf)
 
     # TODO: remove this and use dedicated class
     def add_asset_prices(self, asset_prices: pd.DataFrame):
@@ -1277,8 +1289,11 @@ class PortfolioTranches:
             mask = new_pft_assigned_tranches == ii
             ii_new_rebals = new_rebals[mask]
             print(ii_new_rebals)
-            self.ptf_tranches[ii].add_rebalancing(model_ptf = ii_new_rebals)
+            
+            self.ptf_tranches[ii].add_model_portfolio(model_ptf = ii_new_rebals)
+
             self.ptf_tranches[ii].compute_ptf_weights(close_prices = new_prices)
+            print(self.ptf_tranches[ii].close_weights)
 
 
 

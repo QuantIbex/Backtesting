@@ -1156,46 +1156,43 @@ class PortfolioTranches:
     """
     
     """
-    def __init__(self, nb_tranches: int = 1, reset_period: str = None, reset_type: str = None):
+    def __init__(self, nb_tranches: int = 1,
+                 alloc_period: int = 1,
+                 alloc_type: str = "equally-weighted"):
         """Instantiate class object"""
 
-        # Handle nb_tranches parameter
+        # Sanity check: nb_tranches is integer
         if not isinstance(nb_tranches, int):
             raise TypeError("Input 'nb_tranches' must be an integer.")
         
-        if not nb_tranches > 0:
+        # Sanity check: nb_tranches is positive
+        if nb_tranches <= 0:
             raise ValueError("Input 'nb_tranches' must be positive.")
         
-        # Handle reset_period parameter
-        if nb_tranches == 1:
-            if reset_period is not None:
-                warnings.warn("Discarding input 'reset_period' and setting to 'None'.", UserWarning)
-                reset_period = None
-        else:
-            if reset_period not in (None, 1, nb_tranches):
-                raise ValueError("Input 'nb_tranches' must be either 'None', '1' or equal to 'nb_tranches'.")
-            
-        # Handle reset_type parameter
-        if reset_period is None:
-            if reset_type is not None:
-                warnings.warn("Discarding input 'reset_type' and setting to 'None'.", UserWarning)
-                reset_type = None
-        else:
-            if reset_type not in (None, "equally-weighted"):
-                raise ValueError("Input 'reset_type' must be either 'None' or 'equally-weighted'.")
-            reset_type = "equally-weighted"
+        # Sanity check: alloc_period has admissible value
+        if alloc_period not in (None, 1, nb_tranches):
+            raise ValueError("Input 'alloc_period' must be either 'None', '1' or equal to 'nb_tranches'.")
 
+        # Sanity check: reset_period is admissible value
+        if alloc_type not in ("equally-weighted"):
+            raise ValueError("Input 'alloc_type' must be (for now) 'equally-weighted'.")
+
+        # Overwrite alloc_period parameter
+        if nb_tranches == 1 and alloc_period != 1:
+            warnings.warn("Discarding input 'alloc_period' and setting to '1'.", UserWarning)
+            alloc_period = 1
+        
         # Parameters
         self.nb_tranches = nb_tranches
-        self.reset_period = reset_period
-        self.reset_type = reset_type
+        self.alloc_period = alloc_period
+        self.alloc_type = alloc_type
 
         # Data
         self._model_ptf = ModelPortfolio()
         self.asset_growth_factor = None # Replace by asset prices class
         
         # Variables
-        self.model_ptf_assigned_tranche = None
+        # self.tranche_assignment = None
         self.ptf_tranches = [PortfolioWeights() for _ in range(nb_tranches)]
         self.ptf_global = PortfolioWeights()
 
@@ -1204,7 +1201,21 @@ class PortfolioTranches:
     def model_ptf(self):
         """Model portfolio getter with validation."""
         return self._model_ptf.model_ptf
+    
+    @property
+    def tranche_assignment(self):
+        """Tranche assignment getter"""
+        if self.model_ptf is None:
+            return None
+        else:
+            nb_tranches = self.nb_tranches
+            nb_model_ptf = len(self.model_ptf)
+            tranche_alloc = pd.Series([i % nb_tranches for i in range(nb_model_ptf)],
+                                      index = self.model_ptf.index)
+            return tranche_alloc
 
+
+    # TODO: ensure that model ptf are added only for dates after already available close/eod weights
     def add_model_portfolio(self, model_ptf: pd.DataFrame):
         """ """
         if not isinstance(model_ptf, pd.DataFrame):
@@ -1264,42 +1275,36 @@ class PortfolioTranches:
             # Nothing to do
             return
         
-        self._update_model_ptf_assigned_tranche()
-
-        # Initializing tranches
-        if self.ptf_tranches is None:
-            self.ptf_tranches = [None] * self.nb_tranches
-            for ii in range(self.nb_tranches):
-                self.ptf_tranches[ii] = PortfolioWeights()
-
-            new_rebals = self.model_ptf
-            new_prices = self.asset_growth_factor
-            new_pft_assigned_tranches = self.model_ptf_assigned_tranche
+        # Get new model portfolios
+        if self.ptf_tranches[0].close_weights is None:
+            new_model_ptf = self.model_ptf
         else:
             last_avail_date = self.ptf_tranches[0].close_weights.index[-1]
             mask = self.model_ptf.index.values > last_avail_date
-            new_rebals = self.model_ptf[mask]
-            new_prices = None       # TODO: code this
-            new_pft_assigned_tranches = None # TODO: code this
+            new_model_ptf = self.model_ptf[mask]
+            
+        # Get new tranche assignation
+        self._update_tranche_assignment()
+        new_tranche_assignment = self.tranche_assignment[new_model_ptf.index]
 
-        # Update tranches
+        # Iterate on tranches
         for ii in range(self.nb_tranches):
             print(f"Handling tranche {ii}")
             
             # Update tranche model portfolio
-            mask = new_pft_assigned_tranches == ii
+            mask = new_tranche_assignment == ii
             if mask.any():
-                ii_new_rebals = new_rebals[mask]
-                self.ptf_tranches[ii].add_model_portfolio(model_ptf = ii_new_rebals)
+                ii_new_model_ptf = new_model_ptf[mask]
+                self.ptf_tranches[ii].add_model_portfolio(model_ptf = ii_new_model_ptf)
 
             # Update tranche portfolio weights
-            self.ptf_tranches[ii].compute_ptf_weights(close_prices = new_prices)
+            self.ptf_tranches[ii].compute_ptf_weights(close_prices = self.asset_growth_factor)
 
 
 
 
 
-    def _update_model_ptf_assigned_tranche(self):
+    def _update_tranche_assignment(self):
         """Obvious"""
 
         # Get new model portfolio tranche assignation 
@@ -1308,16 +1313,13 @@ class PortfolioTranches:
         new_mpat = pd.Series([i % n for i in range(N)], index = self.model_ptf.index)
         
         # Sanity check
-        if self.model_ptf_assigned_tranche is not None:
-            current_mpat = self.model_ptf_assigned_tranche
-            # print(current_mpat)
-            # print(len(current_mpat))
-            # print(new_mpat)
+        if self.tranche_assignment is not None:
+            current_mpat = self.tranche_assignment
 
             if pd.testing.assert_series_equal(new_mpat.iloc[:len(current_mpat)], current_mpat):
                 raise ValueError("Attempting to replace model portfolio tranche assignment with different values.")
 
-        self.model_ptf_assigned_tranche = new_mpat
+        # self.tranche_assignment = new_mpat
 
 
 

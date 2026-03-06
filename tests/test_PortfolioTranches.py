@@ -26,50 +26,49 @@ class TestPortfolioTranches(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "Input 'nb_tranches' must be positive.")
 
         with self.assertRaises(ValueError) as ctx:
-            pt = BT.PortfolioTranches(nb_tranches = 3, reset_period = 4)
-        self.assertEqual(str(ctx.exception), "Input 'nb_tranches' must be either 'None', '1' or equal to 'nb_tranches'.")
+            pt = BT.PortfolioTranches(nb_tranches = 3, alloc_period = 4)
+        self.assertEqual(str(ctx.exception), "Input 'alloc_period' must be either 'None', '1' or equal to 'nb_tranches'.")
 
         with self.assertRaises(ValueError) as ctx:
-            pt = BT.PortfolioTranches(nb_tranches = 3, reset_period = 1, reset_type = "dummy")
-        self.assertEqual(str(ctx.exception), "Input 'reset_type' must be either 'None' or 'equally-weighted'.")
+            pt = BT.PortfolioTranches(nb_tranches = 3, alloc_period = 1, alloc_type = "dummy")
+        self.assertEqual(str(ctx.exception), "Input 'alloc_type' must be (for now) 'equally-weighted'.")
 
     def test_Init_Warnings(self):
         """Obvious"""
         with self.assertWarns(UserWarning) as cm:
-            BT.PortfolioTranches(nb_tranches = 1, reset_period = 1)
-        self.assertEqual(str(cm.warning), "Discarding input 'reset_period' and setting to 'None'.")
-
-        with self.assertWarns(UserWarning) as cm:
-            BT.PortfolioTranches(nb_tranches = 1, reset_period = None, reset_type="equally-weighted")
-        self.assertEqual(str(cm.warning), "Discarding input 'reset_type' and setting to 'None'.")
+            BT.PortfolioTranches(nb_tranches = 1, alloc_period = None)
+        self.assertEqual(str(cm.warning), "Discarding input 'alloc_period' and setting to '1'.")
 
     def test_Init_Defaults(self):
         """Obvious"""
         actual = BT.PortfolioTranches()
-        expected = BT.PortfolioTranches(nb_tranches = 1, reset_period = None, reset_type = None)
+        expected = BT.PortfolioTranches(nb_tranches = 1, alloc_period = 1, 
+                                        alloc_type = "equally-weighted")
         self.assertEqual(actual.nb_tranches, expected.nb_tranches)
-        self.assertEqual(actual.reset_period, expected.reset_period)
-        self.assertEqual(actual.reset_type, expected.reset_type)
+        self.assertEqual(actual.alloc_period, expected.alloc_period)
+        self.assertEqual(actual.alloc_type, expected.alloc_type)
 
     def test_Init(self):
         """Obvious"""
-        pt = BT.PortfolioTranches(nb_tranches = 1, reset_period = None, reset_type = None)
+        pt = BT.PortfolioTranches(nb_tranches = 1, alloc_period = 1, alloc_type = "equally-weighted")
         self.assertEqual(pt.nb_tranches, 1)
-        self.assertIsNone(pt.reset_period)
-        self.assertIsNone(pt.reset_type)
-        self.assertTrue(isinstance(pt._model_ptf, BT.ModelPortfolio))
+        self.assertEqual(pt.alloc_period, 1)
+        self.assertEqual(pt.alloc_type, "equally-weighted")
         self.assertTrue(isinstance(pt._model_ptf, BT.ModelPortfolio))
         self.assertIsNone(pt.asset_growth_factor)
-        self.assertIsNone(pt.model_ptf_assigned_tranche)
+        self.assertIsNone(pt.tranche_assignment)
         self.assertTrue(all([isinstance(x, BT.PortfolioWeights) for x in pt.ptf_tranches]))
         self.assertTrue(isinstance(pt.ptf_global, BT.PortfolioWeights))
         
-
-        pt = BT.PortfolioTranches(nb_tranches = 3, reset_period = 1, reset_type = "equally-weighted")
+        pt = BT.PortfolioTranches(nb_tranches = 3, alloc_period = 1, alloc_type = "equally-weighted")
         self.assertEqual(pt.nb_tranches, 3)
-        self.assertEqual(pt.reset_period, 1)
-        self.assertEqual(pt.reset_type, "equally-weighted")
+        self.assertEqual(pt.alloc_period, 1)
+        self.assertEqual(pt.alloc_type, "equally-weighted")
         self.assertTrue(isinstance(pt._model_ptf, BT.ModelPortfolio))
+        self.assertIsNone(pt.asset_growth_factor)
+        self.assertIsNone(pt.tranche_assignment)
+        self.assertTrue(all([isinstance(x, BT.PortfolioWeights) for x in pt.ptf_tranches]))
+        self.assertTrue(isinstance(pt.ptf_global, BT.PortfolioWeights))
 
     # TODO: consider removing this test as it relies on the ModelPortfolio class
     def test_add_model_portfolio___Errors(self):
@@ -222,7 +221,7 @@ class TestPortfolioTranches(unittest.TestCase):
         actual = pt.asset_growth_factor
         pd.testing.assert_frame_equal(actual, expected)
 
-    def test__update_model_ptf_assigned_tranche(self):
+    def test_property_tranche_assignment(self):
         """Obvious"""
 
         inds = pd.to_datetime(["2025-12-31", "2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"])
@@ -232,13 +231,19 @@ class TestPortfolioTranches(unittest.TestCase):
              "C": [0.3, 0.4, 0.1, 0.2, 0.3],
              "D": [0.4, 0.1, 0.2, 0.3, 0.4]}, index = inds)
 
+        # No update - Several tranches
+        nb_tranches = 3
+        expected = pd.Series([0, 1, 2, 0, 1], index = inds)
+        pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
+        actual = pt.tranche_assignment
+        self.assertIsNone(actual)
+
         # Single updates - Only 1 tranche
         nb_tranches = 1
         expected = pd.Series(0, index = inds)
         pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
         pt.add_model_portfolio(model_ptf = model_ptf)
-        pt._update_model_ptf_assigned_tranche()
-        actual = pt.model_ptf_assigned_tranche
+        actual = pt.tranche_assignment
         pd.testing.assert_series_equal(actual, expected)
 
         # Single updates - Few tranches
@@ -246,8 +251,7 @@ class TestPortfolioTranches(unittest.TestCase):
         expected = pd.Series([0, 1, 2, 0, 1], index = inds)
         pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
         pt.add_model_portfolio(model_ptf = model_ptf)
-        pt._update_model_ptf_assigned_tranche()
-        actual = pt.model_ptf_assigned_tranche
+        actual = pt.tranche_assignment
         pd.testing.assert_series_equal(actual, expected)
 
         # Single updates - Many tranches
@@ -255,8 +259,7 @@ class TestPortfolioTranches(unittest.TestCase):
         expected = pd.Series([0, 1, 2, 3, 4], index = inds)
         pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
         pt.add_model_portfolio(model_ptf = model_ptf)
-        pt._update_model_ptf_assigned_tranche()
-        actual = pt.model_ptf_assigned_tranche
+        actual = pt.tranche_assignment
         pd.testing.assert_series_equal(actual, expected)
 
         # Multiple updates - Only 1 tranche
@@ -264,10 +267,8 @@ class TestPortfolioTranches(unittest.TestCase):
         expected = pd.Series(0, index = inds)
         pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
         pt.add_model_portfolio(model_ptf = model_ptf.iloc[:3, :])
-        pt._update_model_ptf_assigned_tranche()
         pt.add_model_portfolio(model_ptf = model_ptf.iloc[3:, :])
-        pt._update_model_ptf_assigned_tranche()
-        actual = pt.model_ptf_assigned_tranche
+        actual = pt.tranche_assignment
         pd.testing.assert_series_equal(actual, expected)
 
         # Multiple updates - Few tranches
@@ -275,10 +276,8 @@ class TestPortfolioTranches(unittest.TestCase):
         expected = pd.Series([0, 1, 2, 0, 1], index = inds)
         pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
         pt.add_model_portfolio(model_ptf = model_ptf.iloc[:3, :])
-        pt._update_model_ptf_assigned_tranche()
         pt.add_model_portfolio(model_ptf = model_ptf.iloc[3:, :])
-        pt._update_model_ptf_assigned_tranche()
-        actual = pt.model_ptf_assigned_tranche
+        actual = pt.tranche_assignment
         pd.testing.assert_series_equal(actual, expected)
 
         # Multiple updates - Many tranches
@@ -286,12 +285,9 @@ class TestPortfolioTranches(unittest.TestCase):
         expected = pd.Series([0, 1, 2, 3, 4], index = inds)
         pt = BT.PortfolioTranches(nb_tranches = nb_tranches)
         pt.add_model_portfolio(model_ptf = model_ptf.iloc[:3, :])
-        pt._update_model_ptf_assigned_tranche()
         pt.add_model_portfolio(model_ptf = model_ptf.iloc[3:, :])
-        pt._update_model_ptf_assigned_tranche()
-        actual = pt.model_ptf_assigned_tranche
+        actual = pt.tranche_assignment
         pd.testing.assert_series_equal(actual, expected)
-
 
     def NOT_test_update_tranches(self):
         """Obvious"""
@@ -323,24 +319,22 @@ class TestPortfolioTranches(unittest.TestCase):
         pt.add_asset_prices(asset_prices = asset_prices_2)
         pt.update_tranches()
 
-        pt.model_ptf.index
 
-        pt.ptf_tranches[0]
-        pt.ptf_tranches[0].close_weights
-        pt.ptf_tranches[0].eod_weights
+        if False:
+            pt.model_ptf.index
 
+            pt.ptf_tranches[0]
+            pt.ptf_tranches[0].close_weights
+            pt.ptf_tranches[0].eod_weights
 
+            # Data
+            pt.asset_growth_factor
+            pt.model_ptf
 
-
-
-        # Data
-        pt.asset_growth_factor
-        pt.model_ptf
-
-        # Variables
-        pt.model_ptf_assigned_tranche
-        pt.ptf_tranches
-        pt.ptf_global
+            # Variables
+            pt.tranche_assignment
+            pt.ptf_tranches
+            pt.ptf_global
 
 
 
